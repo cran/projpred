@@ -103,8 +103,9 @@ proj_helper <- function(object, xnew, offsetnew, weightsnew, nv, seed_samp,
     stop(paste('The number of columns in xnew does not match with the given',
                'number of variable indices (vind).'))
 
-  # save the old seed and initialize with the new one
-  seed_old <- .Random.seed
+  # set random seed but ensure the old RNG state is restored on exit
+  rng_state_old <- rngtools::RNGseed()
+  on.exit(rngtools::RNGseed(rng_state_old))
   set.seed(seed_samp)
 
   preds <- lapply(projs, function(proj) {
@@ -120,9 +121,6 @@ proj_helper <- function(object, xnew, offsetnew, weightsnew, nv, seed_samp,
 
     fun(proj, mu, offsetnew, weightsnew)
   })
-
-  # restore the old seed
-  .Random.seed <- seed_old
 
   .unlist_proj(preds)
 }
@@ -190,7 +188,7 @@ proj_predict <- function(object, xnew, offsetnew = NULL, weightsnew = NULL,
               fun = fun, ...)
 }
 
-#' Plotting or printing summary statistics related to variable selection
+#' Plot or fetch summary statistics related to variable selection
 #'
 #' \code{varsel_stats} can be used to obtain summary statistics related to
 #' variable selection. The same statistics can be plotted with
@@ -200,26 +198,32 @@ proj_predict <- function(object, xnew, offsetnew = NULL, weightsnew = NULL,
 #'
 #' @param object The object returned by \link[=varsel]{varsel} or
 #' \link[=cv_varsel]{cv_varsel}.
-#' @param ... Currently ignored.
 #' @param nv_max Maximum submodel size for which the statistics are calculated.
-#' @param stats A list of strings of statistics to calculate. Available
-#' options are: mlpd, kl, mse (gaussian only), pctcorr (binomial only).
-#' If \code{NULL}, set to varsel_plot plots only mlpd, but varsel_stats
-#' return all the statistics.
-#' @param type One of 'mean', 'lower', 'upper' indicating whether to compute mean,
-#' or either the lower or upper credible bound. Upper and lower bounds are determined so
+#' @param stats One or several strings determining which statistics to calculate. Available
+#' statistics are: 
+#' \itemize{
+#'  \item{elpd:} {(Expected) sum of log predictive densities}
+#'  \item{mlpd:} {Mean log predictive density, that is, elpd divided by the number of datapoints.}
+#'  \item{mse:} {Mean squared error (gaussian family only)}
+#'  \item{rmse:} {Root mean squared error (gaussian family only)}
+#'  \item{acc/pctcorr:} {Classification accuracy (binomial family only)}
+#' }
+#' Default is elpd.
+#' @param type One or more items from 'mean', 'se', 'lower' and 'upper' indicating which of these to
+#' compute (mean, standard error, and lower and upper credible bounds). The credible bounds are determined so
 #' that \code{1-alpha} percent of the mass falls between them.
 #' @param deltas If \code{TRUE}, the difference between the full model and the
 #' submodel is returned instead of the actual value of the statistic.
 #' Defaults to \code{FALSE}.
 #' @param alpha A number indicating the desired coverage of the credible
-#' intervals. Eg. \code{alpha=0.1} corresponds to 90\% probability mass
-#' within the intervals. Defaults to \code{0.1}.
+#' intervals. E.g. \code{alpha=0.1} corresponds to 90\% probability mass
+#' within the intervals.
+#' @param ... Currently ignored.
 NULL
 
 #' @rdname varsel-statistics
 #' @export
-varsel_plot <- function(object, ..., nv_max = NULL, stats = NULL, deltas = F, alpha = 0.1) {
+varsel_plot <- function(object, nv_max = NULL, stats = 'elpd', deltas = F, alpha = 0.1, ...) {
   
 	if(!('varsel' %in% names(object)))
 	  stop(paste('The provided object doesn\'t contain information about the',
@@ -235,9 +239,6 @@ varsel_plot <- function(object, ..., nv_max = NULL, stats = NULL, deltas = F, al
 		}
 	} else
 		refstat_found <- T
-	
-	if(is.null(stats)) 
-	  stats <- 'mlpd' 
 	
 	# compute all the statistics and fetch only those that were asked
 	tab <- .tabulate_stats(object$varsel, alpha)
@@ -288,7 +289,8 @@ varsel_plot <- function(object, ..., nv_max = NULL, stats = NULL, deltas = F, al
 
 #' @rdname varsel-statistics
 #' @export
-varsel_stats <- function(object, ..., nv_max = NULL, type = 'mean', deltas = F, alpha=0.1) {
+varsel_stats <- function(object, nv_max = NULL, stats = 'elpd', type = c('mean','se'), 
+                         deltas = F, alpha=0.1, ...) {
   
 	if(!('varsel' %in% names(object)))
       stop(paste('The provided object doesn\'t contain information about the',
@@ -302,25 +304,132 @@ varsel_stats <- function(object, ..., nv_max = NULL, type = 'mean', deltas = F, 
 	
   tab <- .tabulate_stats(object$varsel, alpha=alpha)
   stats_table <- subset(tab, (tab$delta == deltas | tab$statistic == 'kl') & tab$size != Inf)
-  stats <- as.character(unique(stats_table$statistic))
+  
+  # these are the corresponding names for mean, se, upper and lower in the stats_table, and their suffices
+  # in the table to be returned 
+  qty <- unname(sapply(type, function(t) switch(t, mean='value', upper='uq', lower='lq', se='se')))
+  suffix <- unname(sapply(type, function(t) switch(t, mean='', upper='.upper', lower='.lower', se='.se')))
+  
 
-  # transform type to the names that appear in the statistic table, and pick the
-  # required values
-  type <- switch(type, mean='value', upper='uq', lower='lq')
-  arr <- data.frame(sapply(stats, function(sname) {
-      unname(subset(stats_table, stats_table$statistic == sname, type))
-  }))
-  arr <- cbind(size = unique(stats_table$size), arr)
+  # loop through all the required statistics 
+  arr <- data.frame(size = unique(stats_table$size), vind = c(NA, object$varsel$vind))
+  for (i in seq_along(stats)) {
+    
+    temp <- subset(stats_table, stats_table$statistic == stats[i], qty)
+    newnames <- sapply(suffix, function(s) paste0(stats[i],s))
+    colnames(temp) <- newnames
+    # if (is.null(arr))
+      # arr <- temp
+    # else
+      arr <- cbind(arr, temp)
+  }
 
   if(is.null(nv_max)) 
     nv_max <- max(stats_table$size)
 
-  arr$vind <- c(NA, object$varsel$vind)
   if('pctch' %in% names(object$varsel))
     arr$pctch <- c(NA, diag(object$varsel$pctch[,-1]))
 
   subset(arr, arr$size <= nv_max)
 }
+
+
+
+
+
+#' Suggest model size 
+#'
+#' This function can be used for suggesting an appropriate model size
+#' based on certain rule. Notice that the decision rules are heuristic
+#' and should be interpreted as guidelines. It is recommended that the user
+#' studies the results via \code{varsel_plot} and or \code{varsel_stats}
+#' and makes the final decision based on what is most appropriate for the given
+#' problem.
+#'
+#' @param object The object returned by \link[=varsel]{varsel} or
+#' \link[=cv_varsel]{cv_varsel}.
+#' @param stat Statistic used for the decision. Default is elpd. See \code{varsel_stats} for
+#' other possible choices. 
+#' @param alpha A number indicating the desired coverage of the credible
+#' intervals based on which the decision is made. E.g. \code{alpha=0.1} corresponds to
+#' 90\% probability mass within the intervals. See details for more information.
+#' @param pct Number indicating the relative proportion between full model and null model
+#' utilities one is willing to sacrifice. See details for more information.
+#' @param type Either 'upper' (default) or 'lower' determining whether the decisions are
+#' based on the upper or lower credible bounds. See details for more information.
+#' @param warnings Whether to give warnings if automatic suggestion fails, mainly for internal use.
+#' Default is TRUE, and usually no reason to set to FALSE.
+#' @param ... Currently ignored.
+#' 
+#' @details The suggested model size is the smallest model for which
+#' either the lower or upper (depending on argument \code{type}) credible bound 
+#' of the submodel utility \eqn{u_k} with significance level \code{alpha} falls above
+#'   \deqn{u_ref - pct*(u_ref - u_0)} 
+#' Here \eqn{u_ref} denotes the reference model utility and \eqn{u_0} the null model utility
+#' (currently the utility is taken to be the mean log predictive density, MLPD).
+#' The lower and upper bounds are defined to contain the submodel utility with 
+#' probability 1-alpha (each tail has mass alpha/2).
+#' 
+#' By default \code{ratio=0}, \code{alpha=0.32} and \code{type='upper'} which means that we select the smallest
+#' model for which the upper tail exceeds the reference model level, that is, which is better than the reference 
+#' model with probability 0.16 (and consequently, worse with probability 0.84). In other words,
+#' the estimated difference between the reference model and submodel utitlities is at most one standard error
+#' away from zero, so the two utilities are considered to be close.
+#' 
+
+#' @export
+suggest_size <- function(object, stat = 'elpd', alpha = 0.32, pct = 0.0, type='upper', warnings=TRUE, ...) {
+  
+  if ('varsel' %in% names(object))
+    varsel <- object$varsel
+  else
+    stop(paste0('The provided object does not contain information about variable selection.',
+         'Run variable selection first.'))
+  
+  btype <- ifelse(type=='upper', 'uq', 'lq')
+  tab <- .tabulate_stats(varsel, alpha = alpha)
+  stats <- subset(tab, tab$statistic == stat & tab$delta == TRUE & tab$size != Inf &
+                    tab$data %in% c('train', 'test', 'loo', 'kfold'))
+  
+  if (!all(is.na(stats[,'value']))) {
+    
+    util_null <- subset(stats, stats$size == 0, 'value')
+    util_cutoff <- pct*util_null
+    res <- subset(stats, stats[,btype] >= util_cutoff$value, 'size')
+    if(nrow(res) == 0) {
+      # no submodel satisfying the criterion found
+      if (varsel$nv_max == varsel$nv_all)
+        ssize <- varsel$nv_max
+      else {
+        ssize <- NA
+        if (warnings)
+          warning(paste('Could not suggest model size. Investigate varsel_plot to identify',
+                        'if the search was terminated too early. If this is the case,',
+                        'run variable selection with larger value for nv_max.'))
+      }
+      
+    } else {
+      ssize <- min(res)
+    }
+  } else {
+    # special case; all values compared to the reference model are NA indicating
+    # that the reference model is missing, so suggest the smallest model which
+    # has its mlpd estimate within one standard deviation of the highest mlpd estimate,
+    # i.e. is contained in the 68% central region
+    tab <- .tabulate_stats(varsel, alpha = 0.32)
+    stats <- subset(tab, tab$statistic == stat & tab$delta == F &
+                      tab$data %in% c('train', 'test', 'loo', 'kfold'))
+    imax <- which.max(unname(unlist(stats['value'])))
+    thresh <- stats[imax, 'lq']
+    ssize <- min(subset(stats, stats$value >= thresh, 'size'))
+  }
+  ssize
+}
+
+
+
+
+
 
 #' Generic reference model initialization
 #'
@@ -488,11 +597,11 @@ as.matrix.projection <- function(x, ...) {
 cvind <- function(n, k, out='foldwise', seed=NULL) {
 
 	ind <- c(1:n)
-	if (!is.null(seed)) {
-		# save the old seed and initialize with the new one
-		seed_old <- .Random.seed
-		set.seed(seed)
-	}
+	
+	# set random seed but ensure the old RNG state is restored on exit
+	rng_state_old <- rngtools::RNGseed()
+	on.exit(rngtools::RNGseed(rng_state_old))
+	set.seed(seed)
 	
 	# shuffle the indices
 	ind <- sample(ind, n, replace=FALSE)
@@ -515,10 +624,6 @@ cvind <- function(n, k, out='foldwise', seed=NULL) {
 		}
 	} else
 		stop(paste0('Unknown output format requested: ', out))
-	
-	if (!is.null(seed))
-		# restore the old seed
-		.Random.seed <- seed_old
 	
 	return(cv)
 }

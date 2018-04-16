@@ -18,7 +18,7 @@
 #' @param nspred Number of samples used for prediction (after selection). Ignored if ncpred is given.
 #' @param ncpred Number of clusters used for prediction (after selection). Default is 5.
 #' @param nv_max Maximum number of varibles until which the selection is continued.
-#'    Defaults to min(D, floor(0.4*n)) where n is the number of observations and
+#'    Defaults to min(20, D, floor(0.4*n)) where n is the number of observations and
 #'    D the number of variables.
 #' @param intercept Whether to use intercept in the submodels. Defaults to TRUE.
 #' @param penalty Vector determining the relative penalties or costs for the variables.
@@ -126,7 +126,7 @@ varsel <- function(fit, d_test = NULL, method = NULL, ns = NULL, nc = NULL,
   	}
   }
   
-  # store the relevant fields into fit
+  # store the relevant fields into fit  
   fit$varsel <- list(vind = setNames(vind, vars$coefnames[vind]),
                      kl = sapply(p_sub, function(x) x$kl),
                      d_test = c(d_test[c('y','weights')], type = d_type),
@@ -134,14 +134,9 @@ varsel <- function(fit, d_test = NULL, method = NULL, ns = NULL, nc = NULL,
                      family_kl = family_kl)
 
   # suggest model size
-  ssize <- .suggest_size(fit$varsel)
-  # if(is.na(ssize)) {
-    # try a more relaxed value, if this does not work either, issue a warning
-    # ssize <- .suggest_size(fit$varsel, cutoff_pct = 0.2)
-    # if(is.na(ssize))
-      # warning('Submodels too close to each other, cant suggest a submodel.')
-  # }
-  fit$varsel$ssize <- ssize
+  fit$varsel$nv_max <- nv_max
+  fit$varsel$nv_all <- ncol(vars$x)
+  fit$varsel$ssize <- suggest_size(fit, warnings = F)
   
   fit
 }

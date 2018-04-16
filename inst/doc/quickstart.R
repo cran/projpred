@@ -7,11 +7,12 @@ knitr::opts_chunk$set(
     fig.width = 7, fig.height = 5
 )
 
-## ---- message=F, warning=F-----------------------------------------------
+## ---- results='hide', message=F, warning=F-------------------------------
 library(rstanarm)
 library(projpred)
 library(ggplot2)
 library(bayesplot)
+theme_set(theme_bw())
 #options(mc.cores = parallel::detectCores())
 
 ## ------------------------------------------------------------------------
@@ -32,22 +33,22 @@ fit <- stan_glm(y ~ x, family=gaussian(), data=df_gaussian, prior=prior_coeff,
 
 ## ------------------------------------------------------------------------
 fit <- varsel(fit, method='forward')
-fit$varsel$vind
+fit$varsel$vind # variables ordered as they enter during the search
 
 ## ------------------------------------------------------------------------
 # plot predictive performance on training data 
-varsel_plot(fit, stats=c('mlpd', 'mse'))
+varsel_plot(fit, stats=c('elpd', 'rmse'))
 
 ## ---- results='hide', warning=F, cache=T---------------------------------
 fit_cv <- cv_varsel(fit, method='forward')
 
 ## ------------------------------------------------------------------------
 # model size suggested by the program
-fit_cv$varsel$ssize
+suggest_size(fit_cv)
 
 ## ------------------------------------------------------------------------
-# plot the validation results
-varsel_plot(fit_cv, stats = c('mlpd', 'mse'), deltas=T)
+# plot the validation results, this time relative to the full model
+varsel_plot(fit_cv, stats = c('elpd', 'rmse'), deltas=T)
 
 ## ------------------------------------------------------------------------
 # Visualise the three most relevant variables in the full model
@@ -87,18 +88,18 @@ fit <- varsel(fit, method='forward')
 fit$varsel$vind
 
 ## ------------------------------------------------------------------------
-varsel_plot(fit, stats=c('mlpd', 'pctcorr'), deltas=F)
+varsel_plot(fit, stats=c('elpd', 'acc'), deltas=F)
 
 ## ---- results='hide', warning=F, cache=T---------------------------------
 fit_cv <- cv_varsel(fit, method='forward')
 
 ## ------------------------------------------------------------------------
 # model size suggested by the program
-fit_cv$varsel$ssize
+suggest_size(fit_cv)
 
 ## ------------------------------------------------------------------------
 # plot the validation results
-varsel_plot(fit_cv, stats=c('mlpd', 'pctcorr'), deltas=T)
+varsel_plot(fit_cv, stats=c('elpd', 'acc'), deltas=T)
 
 ## ------------------------------------------------------------------------
 # evaluate the predictive distribution in a 2d grid

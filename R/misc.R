@@ -141,12 +141,13 @@ log_sum_exp <- function(x) {
 	# an argument in place of fit.
 	#
   if (is.null(seed))
-    seed <- 1
+    seed <- 17249420
 
-	# save the old seed and initialize with the new one
-	seed_old <- .Random.seed
-	set.seed(seed)
-
+  # set random seed but ensure the old RNG state is restored on exit
+  rng_state_old <- rngtools::RNGseed()
+  on.exit(rngtools::RNGseed(rng_state_old))
+  set.seed(seed)
+  
 	if ( all(c('fam', 'x', 'mu', 'dis') %in% names(fit)) )
 		# all the relevant fields contained in the given structure
 		vars <- fit
@@ -188,9 +189,6 @@ log_sum_exp <- function(x) {
 		predvar <- sapply(1:S, function(j) { fam$predvar(vars$mu[,j,drop=F], vars$dis[j])	})
 		p_ref <- list(mu = vars$mu, var = predvar, dis = vars$dis, weights = vars$wsample, cl=c(1:S))
 	}
-
-	# restore the old seed
-	.Random.seed <- seed_old
 
 	return(p_ref)
 }
@@ -320,44 +318,6 @@ log_sum_exp <- function(x) {
   }
 }
 
-.suggest_size <- function(varsel, alpha = 0.66, cutoff_pct = 0.0, type='upper') {
-  # Suggest a model size. Currently finds the smallest model for which
-  # either the lower or upper (depending on argument type) credible bound 
-  # of the submodel utility u_k with significance level alpha is above:
-  #   u_ref - cutoff_pct*(u_ref - u0) 
-  # Here u_ref denotes the reference model utility and u0 the null model utility.
-  # The lower and upper bounds are defined to contain the submodel utility with 
-  # probability 1-alpha (each tail has mass alpha/2). By default, chooses the
-  # smallest model with 0.33 chance of being better than the reference model.
-  btype <- ifelse(type=='upper', 'uq', 'lq')
-  tab <- .tabulate_stats(varsel, alpha = alpha)
-  stats <- subset(tab, tab$statistic == 'mlpd' & tab$delta == TRUE & tab$size != Inf &
-                    tab$data %in% c('train', 'test', 'loo', 'kfold'))
-  
-  if (!all(is.na(stats[,'value']))) {
-  	
-  	mlpd_null <- subset(stats, stats$size == 0, 'value')
-  	mlpd_cutoff <- cutoff_pct*mlpd_null
-  	res <- subset(stats, stats[,btype] >= mlpd_cutoff$value, 'size')
-  	if(nrow(res) == 0) {
-  		ssize <- NA
-  	} else {
-  		ssize <- min(res)
-  	}
-  } else {
-  	# special case; all values compared to the reference model are NA indicating
-  	# that the reference model is missing, so suggest the smallest model which
-    # has its mlpd estimate within one standard deviation of the highest mlpd estimate,
-    # i.e. is contained in the 68% central region
-    tab <- .tabulate_stats(varsel, alpha = 0.32)
-  	stats <- subset(tab, tab$statistic == 'mlpd' & tab$delta == F &
-  	                  tab$data %in% c('train', 'test', 'loo', 'kfold'))
-  	imax <- which.max(unname(unlist(stats['value'])))
-  	thresh <- stats[imax, 'lq']
-  	ssize <- min(subset(stats, tab$value >= thresh, 'size'))
-  }
-  ssize
-}
 
 .df_to_model_mat <- function(dfnew, var_names) {
   f <- formula(paste('~', paste(c('0', var_names), collapse = ' + ')))
