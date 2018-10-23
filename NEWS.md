@@ -2,6 +2,17 @@
 
 # News
 
+
+## projpred 1.1.0
+
+### New features 
+
+* Added support for ```brms``` models. 
+
+### Bug fixes
+* The program crashed with ```rstanarm``` models fitted with syntax like ```stan_glm(log(y) ~ log(x), ...)```, that is, it did not allow transformation for ```y```.
+
+
 ## projpred 1.0.0
 
 ### New features and improvements ###
