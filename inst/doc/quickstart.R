@@ -1,5 +1,5 @@
 params <-
-structure(list(EVAL = FALSE), .Names = "EVAL")
+list(EVAL = FALSE)
 
 ## ---- SETTINGS-knitr, include=FALSE--------------------------------------
 stopifnot(require(knitr))
