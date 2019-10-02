@@ -70,6 +70,9 @@ NULL
 proj_helper <- function(object, xnew, offsetnew, weightsnew, nv, seed_samp,
                         fun, ...) {
 
+  if (!inherits(xnew, c('data.frame', 'matrix')))
+    stop('xnew must be a data.frame or a matrix. See ?proj-pred.')
+
   if (is.null(offsetnew)) offsetnew <- rep(0, nrow(xnew))
   if (is.null(weightsnew)) weightsnew <- rep(1, nrow(xnew))
 
@@ -86,8 +89,7 @@ proj_helper <- function(object, xnew, offsetnew, weightsnew, nv, seed_samp,
   } else {
     # proj is not a projection object
     if(any(sapply(proj, function(x) !('family_kl' %in% names(x)))))
-      stop(paste('proj_linpred only works with objects returned by',
-                 ' varsel, cv_varsel or project'))
+      stop('list contains objects not created by varsel, cv_varsel or project')
   }
 
   projected_sizes <- sapply(proj, function(x) NROW(x$beta))
@@ -108,12 +110,9 @@ proj_helper <- function(object, xnew, offsetnew, weightsnew, nv, seed_samp,
     xnew <- .df_to_model_mat(xnew, terms)
   }
 
-  if (!is.matrix(xnew))
-    stop('xnew not provided in the correct format. See ?proj-pred.')
-
   vind <- list(...)$vind
   if (!is.null(vind) && NCOL(xnew) != length(vind))
-    stop(paste('The number of columns in xnew does not match with the given',
+    stop(paste('The number of columns in xnew does not match the',
                'number of variable indices (vind).'))
 
   # set random seed but ensure the old RNG state is restored on exit
@@ -129,6 +128,9 @@ proj_helper <- function(object, xnew, offsetnew, weightsnew, nv, seed_samp,
       xtemp <- xnew
     } else {
       # fetch the right columns from the feature matrix
+      if (length(proj$vind) > 0 && max(proj$vind) > ncol(xnew))
+        stop(paste('xnew has', ncol(xnew), 'columns, but vind expects',
+                   max(proj$vind), 'columns.'))
       xtemp <- xnew[, proj$vind, drop = F]
     }
     mu <- proj$family_kl$mu_fun(xtemp, proj$alpha, proj$beta, offsetnew)
@@ -213,6 +215,7 @@ proj_predict <- function(object, xnew, offsetnew = NULL, weightsnew = NULL,
 #' @param object The object returned by \link[=varsel]{varsel} or
 #' \link[=cv_varsel]{cv_varsel}.
 #' @param nv_max Maximum submodel size for which the statistics are calculated.
+#' For \code{varsel_plot} it must be at least 1.
 #' @param stats One or several strings determining which statistics to calculate. Available
 #' statistics are: 
 #' \itemize{
@@ -221,6 +224,7 @@ proj_predict <- function(object, xnew, offsetnew = NULL, weightsnew = NULL,
 #'  \item{mse:} {Mean squared error (gaussian family only)}
 #'  \item{rmse:} {Root mean squared error (gaussian family only)}
 #'  \item{acc/pctcorr:} {Classification accuracy (binomial family only)}
+#'  \item{auc:} {Area under the ROC curve (binomial family only)}
 #' }
 #' Default is elpd.
 #' @param type One or more items from 'mean', 'se', 'lower' and 'upper' indicating which of these to
@@ -253,27 +257,11 @@ NULL
 #' @rdname varsel-statistics
 #' @export
 varsel_plot <- function(object, nv_max = NULL, stats = 'elpd', deltas = F, alpha = 0.32, baseline=NULL, ...) {
-  
-	if ( !('vsel' %in% class(object) || 'cvsel' %in% class(object)) )
-		stop('The object does not look like a variable selection -object. Run variable selection first')
-  
-  if (is.null(baseline)) {
-    if ('datafit' %in% class(object$refmodel))
-      baseline <- 'best'
-    else
-      baseline <- 'ref'
-  } else {
-    if (!(baseline %in% c('ref','best')))
-      stop('Argument \'baseline\' must be either \'ref\' or \'best\'.')
-    if (baseline == 'ref' && deltas==T && 'datafit' %in% class(object$refmodel)) {
-      # no reference model (or the results missing for some other reason),
-      # so cannot compute differences between the reference model and submodels
-      deltas <- F
-      warning('Cannot use deltas = TRUE and baseline = \'ref\' when there is no reference model; setting deltas = FALSE.')
-    }
-  }
-	
-	# compute all the statistics and fetch only those that were asked
+
+  .validate_vsel_object_stats(object, stats)
+  baseline <- .validate_baseline(object$refmode, baseline, deltas)
+
+  # compute all the statistics and fetch only those that were asked
   nfeat_baseline <- .get_nfeat_baseline(object, baseline, stats[1])
   tab <- rbind(.tabulate_stats(object, stats, alpha = alpha, nfeat_baseline=nfeat_baseline),
                .tabulate_stats(object, stats, alpha = alpha))
@@ -290,6 +278,12 @@ varsel_plot <- function(object, nv_max = NULL, stats = 'elpd', deltas = F, alpha
 	
 	if(is.null(nv_max))
 	  nv_max <- max(stats_sub$size)
+        else {
+	  # don't exceed the maximum submodel size
+	  nv_max <- min(nv_max, max(stats_sub$size))
+	  if (nv_max < 1)
+	    stop('nv_max must be at least 1')
+	}
 	ylab <- if(deltas) 'Difference to the baseline' else 'Value'
 	
 	# make sure that breaks on the x-axis are integers
@@ -331,25 +325,10 @@ varsel_plot <- function(object, nv_max = NULL, stats = 'elpd', deltas = F, alpha
 #' @export
 varsel_stats <- function(object, nv_max = NULL, stats = 'elpd', type = c('mean','se'), 
                          deltas = F, alpha=0.32, baseline=NULL, ...) {
-  
-	if ( !('vsel' %in% class(object) || 'cvsel' %in% class(object)) )
-		stop('The object does not look like a variable selection -object. Run variable selection first')
-  
-  if (is.null(baseline)) {
-    if ('datafit' %in% class(object$refmodel))
-      baseline <- 'best'
-    else
-      baseline <- 'ref'
-  } else {
-    if (!(baseline %in% c('ref','best')))
-      stop('Argument \'baseline\' must be either \'ref\' or \'best\'.')
-    if (baseline == 'ref' && deltas==T && 'datafit' %in% class(object$refmodel)) {
-      # no reference model (or the results missing for some other reason),
-      # so cannot compute differences between the reference model and submodels
-      warning('Cannot compute statistics for deltas = TRUE and baseline = \'ref\' when there is no reference model.')
-    }
-  }
-  
+
+  .validate_vsel_object_stats(object, stats)
+  baseline <- .validate_baseline(object$refmode, baseline, deltas)
+
   # fetch statistics
   if (deltas) {
     nfeat_baseline <- .get_nfeat_baseline(object, baseline, stats[1])
@@ -383,8 +362,36 @@ varsel_stats <- function(object, nv_max = NULL, stats = 'elpd', type = c('mean',
   subset(arr, arr$size <= nv_max)
 }
 
+#' Print methods for vsel/cvsel objects
+#'
+#' The \code{print} methods for vsel/cvsel objects created by \code{\link{varsel}}
+#' or \code{\link{cv_varsel}}) rely on \code{\link{varsel_stats}} to display
+#' a summary of the results of the projection predictive variable selection.
+#'
+#' @name print-vsel
+#'
+#' @param x An object of class vsel/cvsel.
+#' @param digits Number of decimal places to be reported (2 by default).
+#' @param ... Further arguments passed to \code{\link{varsel_stats}}.
+#'
+#' @return Returns invisibly the data frame produced by \code{\link{varsel_stats}}.
+#'
+#' @export
+#' @method print vsel
+print.vsel <- function(x, digits=2, ...) {
+  stats <- round(varsel_stats(x, ...), digits)
+  print(stats[, -match("vind", colnames(stats))])
+  invisible(stats)
+}
 
-
+#' @rdname print-vsel
+#' @export
+#' @method print cvsel
+print.cvsel <- function(x, digits=2, ...) {
+  stats <- round(varsel_stats(x, ...), digits)
+  print(stats[, -match("vind", colnames(stats))])
+  invisible(stats)
+}
 
 
 #' Suggest model size 
@@ -448,10 +455,10 @@ varsel_stats <- function(object, nv_max = NULL, stats = 'elpd', type = c('mean',
 #' @export
 suggest_size <- function(object, stat = 'elpd', alpha = 0.32, pct = 0.0, type='upper', 
                          baseline=NULL, warnings=TRUE, ...) {
-  
-	
-	if ( !('vsel' %in% class(object) || 'cvsel' %in% class(object)) )
-		stop('The object does not look like a variable selection -object. Run variable selection first')
+
+  .validate_vsel_object_stats(object, stat)
+  if (length(stat) > 1)
+    stop('Only one statistic can be specified to suggest_size')
   
   if (.is_util(stat)) {
     sgn <- 1
@@ -519,7 +526,7 @@ as.matrix.projection <- function(x, ...) {
 #' @name cv-indices
 #'
 #' @param n Number of data points.
-#' @param k Number of folds. 
+#' @param k Number of folds. Must be at least 2 and not exceed \code{n}.
 #' @param out Format of the output, either 'foldwise' (default) or 'indices'. See below for details.
 #' @param seed Random seed so that the same division could be obtained again if needed.
 #'
@@ -545,9 +552,8 @@ NULL
 #' @rdname cv-indices
 #' @export
 cvfolds <- function(n, k, seed=NULL) {
-	
-	if (k > n)
-		stop('k cannot exceed n.')
+
+  .validate_num_folds(k, n)
   
   # set random seed but ensure the old RNG state is restored on exit
   rng_state_old <- .Random.seed
@@ -564,17 +570,18 @@ cvfolds <- function(n, k, seed=NULL) {
 
 #' @rdname cv-indices
 #' @export
-cvind <- function(n, k, out='foldwise', seed=NULL) {
+cvind <- function(n, k, out=c('foldwise', 'indices'), seed=NULL) {
 
-	ind <- c(1:n)
-	
+	.validate_num_folds(k, n)
+	out <- match.arg(out)
+
 	# set random seed but ensure the old RNG state is restored on exit
 	rng_state_old <- .Random.seed
 	on.exit(assign(".Random.seed", rng_state_old, envir = .GlobalEnv))
 	set.seed(seed)
 	
 	# shuffle the indices
-	ind <- sample(ind, n, replace=FALSE)
+	ind <- sample(1:n, n, replace=FALSE)
 	
 	if (out == 'foldwise') {
 		cv <- lapply(1:k, function(i) {
@@ -592,13 +599,7 @@ cvind <- function(n, k, out='foldwise', seed=NULL) {
 			cv$tr[[i]] <- tr
 			cv$ts[[i]] <- ts
 		}
-	} else
-		stop(paste0('Unknown output format requested: ', out))
+	}
 	
 	return(cv)
 }
-
-
-
-
-

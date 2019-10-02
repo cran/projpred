@@ -16,7 +16,8 @@ varsel_stats(object, nv_max = NULL, stats = "elpd", type = c("mean",
 \item{object}{The object returned by \link[=varsel]{varsel} or
 \link[=cv_varsel]{cv_varsel}.}
 
-\item{nv_max}{Maximum submodel size for which the statistics are calculated.}
+\item{nv_max}{Maximum submodel size for which the statistics are calculated.
+For \code{varsel_plot} it must be at least 1.}
 
 \item{stats}{One or several strings determining which statistics to calculate. Available
 statistics are: 
@@ -26,6 +27,7 @@ statistics are:
  \item{mse:} {Mean squared error (gaussian family only)}
  \item{rmse:} {Root mean squared error (gaussian family only)}
  \item{acc/pctcorr:} {Classification accuracy (binomial family only)}
+ \item{auc:} {Area under the ROC curve (binomial family only)}
 }
 Default is elpd.}
 

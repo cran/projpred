@@ -182,14 +182,12 @@ get_stat <- function(mu, lppd, d_test, family, stat, mu.bs=NULL, lppd.bs=NULL,
       value.se <- sd(value.bootstrap1-value.bootstrap2)
     } else {
       value <- sqrt(mean(weights*(mu-y)^2, na.rm=T))
-      value.bootstrap <- bootstrap((mu-y)^2, function(resid2) sqrt(mean(weights*resid2, na.rm=T)), b=B)
+      value.bootstrap <- bootstrap((mu-y)^2, function(resid2) sqrt(mean(weights*resid2, na.rm=T)), b=B, seed=seed)
       value.se <- sd(value.bootstrap)
     }
     
   } else if (stat == 'acc' || stat == 'pctcorr') {
     
-    if (family$family != 'binomial')
-      stop('Statistic ', stat, ' available only for binomial family.')
     y <- d_test$y
     if (!is.null(mu.bs)) {
       value <- mean( weights*((round(mu)==y) - (round(mu.bs)==y)), na.rm=T )
@@ -199,8 +197,23 @@ get_stat <- function(mu, lppd, d_test, family, stat, mu.bs=NULL, lppd.bs=NULL,
       value.se <- weighted.sd(round(mu) == y, weights, na.rm=T) / sqrt(n_notna)
     }
     
-  } else {
-    stop('Unknown statistic: ', stat)
+  } else if (stat == 'auc') {
+
+    y <- d_test$y
+    auc.data <- cbind(y, mu, weights)
+    if (!is.null(mu.bs)) {
+      mu.bs[is.na(mu)] <- NA # compute the relative auc using only those points
+      mu[is.na(mu.bs)] <- NA # for which both mu and mu.bs are non-NA
+      auc.data.bs <- cbind(y, mu.bs, weights)
+      value <- auc(auc.data) - auc(auc.data.bs)
+      value.bootstrap1 <- bootstrap(auc.data, auc, b=B, seed=seed)
+      value.bootstrap2 <- bootstrap(auc.data.bs, auc, b=B, seed=seed)
+      value.se <- sd(value.bootstrap1 - value.bootstrap2, na.rm=TRUE)
+    } else {
+      value <- auc(auc.data)
+      value.bootstrap <- bootstrap(auc.data, auc, b=B, seed=seed)
+      value.se <- sd(value.bootstrap, na.rm=TRUE)
+    }
   }
   
   lq <- qnorm(alpha/2, mean=value, sd=value.se)
@@ -214,9 +227,8 @@ get_stat <- function(mu, lppd, d_test, family, stat, mu.bs=NULL, lppd.bs=NULL,
 .is_util <- function(stat) {
   # a simple function to determine whether a given statistic (string) is
   # a utility (we want to maximize) or loss (we want to minimize)
-  recognized_stats <- c('elpd','mlpd','acc','pctcorr','r2','mse','rmse')
-  if (!(stat %in% recognized_stats))
-    stop(sprintf('Internal error: non-recognized statistic \'%s\'', stat))
+  # by the time we get here, stat should have already been validated
+
   if (stat %in% c('rmse','mse'))
     return(F)
   else

@@ -43,6 +43,33 @@ log_sum_exp <- function(x) {
 	max_x + log(sum(exp(x - max_x)))
 }
 
+auc <- function(x) {
+  resp <- x[, 1]
+  pred <- x[, 2]
+  weights <- x[, 3]
+  n <- nrow(x)
+  ord <- order(pred, decreasing=TRUE)
+  resp <- resp[ord]
+  pred <- pred[ord]
+  weights <- weights[ord]
+  w0 <- w1 <- weights
+  w0[resp == 1] <- 0 # true negative weights
+  w1[resp == 0] <- 0 # true positive weights
+  cum_w0 <- cumsum(w0)
+  cum_w1 <- cumsum(w1)
+
+  ## ignore tied predicted probabilities, keeping only the rightmost one
+  rightmost.prob <- c(diff(pred) != 0, TRUE)
+  fpr <- c(0, cum_w0[rightmost.prob]) / cum_w0[n]
+  tpr <- c(0, cum_w1[rightmost.prob]) / cum_w1[n]
+  delta_fpr <- c(diff(fpr), 0)
+  delta_tpr <- c(diff(tpr), 0)
+
+  ## sum the area of the rectangles that fall completely below the ROC curve
+  ## plus half the area of the rectangles that are cut in two by the curve
+  return(sum(delta_fpr * tpr) + sum(delta_fpr * delta_tpr) / 2)
+}
+
 bootstrap <- function(x, fun=mean, b=1000, oobfun=NULL, seed=NULL, ...) {
   #
   # bootstrap an arbitrary quantity fun that takes the sample x
@@ -54,15 +81,17 @@ bootstrap <- function(x, fun=mean, b=1000, oobfun=NULL, seed=NULL, ...) {
   rng_state_old <- .Random.seed
   on.exit(assign(".Random.seed", rng_state_old, envir = .GlobalEnv))
   set.seed(seed)
-  
+
+  seq_x <- seq.int(NROW(x))
+  is_vector <- NCOL(x) == 1
   bsstat <- rep(NA, b)
   oobstat <- rep(NA, b)
   for (i in 1:b) {
-    bsind <- sample(seq_along(x), replace=T)
-    bsstat[i] <- fun(x[bsind], ...)
+    bsind <- sample(seq_x, replace=T)
+    bsstat[i] <- fun(if (is_vector) x[bsind] else x[bsind, ], ...)
     if (!is.null(oobfun)) {
-      oobind <- setdiff(seq_along(x), unique(bsind))
-      oobstat[i] <- oobfun(x[oobind], ...)
+      oobind <- setdiff(seq_x, unique(bsind))
+      oobstat[i] <- oobfun(if (is_vector) x[oobind] else x[oobind, ], ...)
     }
   }
   if (!is.null(oobfun)) {
@@ -86,7 +115,53 @@ bootstrap <- function(x, fun=mean, b=1000, oobfun=NULL, seed=NULL, ...) {
 `%ORifNULL%` <- function(a, b) if (is.null(a)) b else a
 
 
+.is.wholenumber <- function(x) abs(x - round(x)) < .Machine$double.eps^0.5
 
+.validate_num_folds <- function(k, n) {
+  if (!is.numeric(k) || length(k) != 1 || !.is.wholenumber(k))
+    stop('Number of folds must be a single integer value.')
+  if (k < 2)
+    stop('Number of folds must be at least 2.')
+  if (k > n)
+    stop('Number of folds cannot exceed n.')
+}
+
+.validate_vsel_object_stats <- function(object, stats) {
+
+  if (!inherits(object, c('vsel', 'cvsel')))
+    stop('The object is not a variable selection object. Run variable selection first')
+
+  recognized_stats <- c('elpd', 'mlpd','mse', 'rmse', 'acc', 'pctcorr', 'auc')
+  binomial_only_stats <- c('acc', 'pctcorr', 'auc')
+  family <- object$family_kl$family
+
+  if (is.null(stats))
+     stop('Statistic specified as NULL.')
+  for (stat in stats) {
+    if (!(stat %in% recognized_stats))
+      stop(sprintf('Statistic \'%s\' not recognized.', stat))
+    if (stat %in% binomial_only_stats && family != 'binomial')
+      stop('Statistic \'', stat, '\' available only for the binomial family.')
+  }
+}
+
+.validate_baseline <- function(refmodel, baseline, deltas) {
+  if (is.null(baseline)) {
+    if (inherits(refmodel, 'datafit'))
+      baseline <- 'best'
+    else
+      baseline <- 'ref'
+  } else {
+    if (!(baseline %in% c('ref', 'best')))
+      stop('Argument \'baseline\' must be either \'ref\' or \'best\'.')
+    if (baseline == 'ref' && deltas == TRUE && inherits(refmodel, 'datafit')) {
+      # no reference model (or the results missing for some other reason),
+      # so cannot compute differences between the reference model and submodels
+      stop('Cannot use deltas = TRUE and baseline = \'ref\' when there is no reference model.')
+    }
+  }
+  return(baseline)
+}
 
 .get_standard_y <- function(y, weights, fam) {
   # return y and the corresponding observation weights into the 'standard' form:
@@ -101,12 +176,17 @@ bootstrap <- function(x, fun=mean, b=1000, oobfun=NULL, seed=NULL, ...) {
     else 
       weights <- rep(1, length(y))
     if (fam$family == 'binomial') {
-      if (is.factor(y))
+      if (is.factor(y)) {
+        if (nlevels(y) > 2)
+          stop('y cannot contain more than two classes if specified as factor.')
         y <- as.vector(y, mode='integer') - 1 # zero-one vector
-      else {
+      } else {
         if (any(y < 0 | y > 1))
           stop("y values must be 0 <= y <= 1 for the binomial model.")
       }
+    } else {
+      if (is.factor(y))
+        stop('y cannot be a factor for models other than the binomial model.')
     }
   } else if (NCOL(y) == 2) {
     weights <- rowSums(y)
