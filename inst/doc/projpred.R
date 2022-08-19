@@ -38,7 +38,7 @@ N <- nrow(dat_gauss)
 # standard deviation):
 tau0 <- p0 / (D - p0) * 1 / sqrt(N)
 
-## ---- cache=TRUE, cache.lazy=FALSE--------------------------------------------
+## -----------------------------------------------------------------------------
 # Set this manually if desired:
 ncores <- parallel::detectCores(logical = FALSE)
 ### Only for technical reasons in this vignette (you can omit this when running
@@ -61,7 +61,7 @@ refm_fit <- stan_glm(
 ## -----------------------------------------------------------------------------
 library(projpred)
 
-## ---- results='hide', cache=TRUE, cache.lazy=FALSE----------------------------
+## ---- results='hide'----------------------------------------------------------
 cvvs <- cv_varsel(
   refm_fit,
   ### Only for the sake of speed (not recommended in general):
@@ -93,7 +93,7 @@ cvvs
 ## -----------------------------------------------------------------------------
 ( soltrms_final <- head(soltrms, modsize_decided) )
 
-## ---- cache=TRUE, cache.lazy=FALSE--------------------------------------------
+## -----------------------------------------------------------------------------
 prj <- project(
   refm_fit,
   solution_terms = soltrms_final,
