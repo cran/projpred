@@ -73,7 +73,7 @@ cvvs <- cv_varsel(
 )
 
 ## ---- fig.asp=1.5 * 0.618-----------------------------------------------------
-plot(cvvs, stats = c("elpd", "rmse"), deltas = TRUE)
+plot(cvvs, stats = c("elpd", "rmse"), deltas = TRUE, seed = 54548)
 
 ## -----------------------------------------------------------------------------
 modsize_decided <- 6

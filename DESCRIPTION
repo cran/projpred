@@ -1,8 +1,8 @@
 Package: projpred
 Encoding: UTF-8
 Title: Projection Predictive Feature Selection
-Version: 2.2.0
-Date: 2022-08-18
+Version: 2.2.1
+Date: 2022-09-20
 Authors@R: c(person("Juho", "Piironen", role = c("aut"),
                     email = "juho.t.piironen@gmail.com"),
              person("Markus", "Paasiniemi", role = "aut"),
@@ -14,7 +14,8 @@ Authors@R: c(person("Juho", "Piironen", role = c("aut"),
              person("Jonah", "Gabry", role = "ctb"),
              person("Marco", "Colombo", role = "ctb"),
              person("Paul-Christian", "Bürkner", role = "ctb"),
-             person("Hamada S.", "Badr", role = "ctb"))
+             person("Hamada S.", "Badr", role = "ctb"),
+             person("Brian", "Sullivan", role = "ctb"))
 Description: 
     Performs projection predictive feature selection for generalized linear and
     additive models as well as for generalized linear and additive multilevel
@@ -39,7 +40,7 @@ LazyData: TRUE
 RoxygenNote: 7.2.1
 VignetteBuilder: knitr, rmarkdown
 NeedsCompilation: yes
-Packaged: 2022-08-19 07:32:07 UTC; frank
+Packaged: 2022-09-20 11:45:52 UTC; frank
 Author: Juho Piironen [aut],
   Markus Paasiniemi [aut],
   Alejandro Catalina [aut],
@@ -48,7 +49,8 @@ Author: Juho Piironen [aut],
   Jonah Gabry [ctb],
   Marco Colombo [ctb],
   Paul-Christian Bürkner [ctb],
-  Hamada S. Badr [ctb]
+  Hamada S. Badr [ctb],
+  Brian Sullivan [ctb]
 Maintainer: Frank Weber <fweber144@protonmail.com>
 Repository: CRAN
-Date/Publication: 2022-08-19 08:40:02 UTC
+Date/Publication: 2022-09-20 13:00:02 UTC
