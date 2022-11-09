@@ -94,11 +94,7 @@ cvvs
 ( soltrms_final <- head(soltrms, modsize_decided) )
 
 ## -----------------------------------------------------------------------------
-prj <- project(
-  refm_fit,
-  solution_terms = soltrms_final,
-  seed = 15705533
-)
+prj <- project(refm_fit, solution_terms = soltrms_final)
 
 ## -----------------------------------------------------------------------------
 prj_mat <- as.matrix(prj)
