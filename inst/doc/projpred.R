@@ -73,19 +73,20 @@ cvvs <- cv_varsel(
 )
 
 ## ---- fig.asp=1.5 * 0.618-----------------------------------------------------
-plot(cvvs, stats = c("elpd", "rmse"), deltas = TRUE, seed = 54548)
+plot(cvvs, stats = c("mlpd", "rmse"), deltas = TRUE, seed = 54548)
 
 ## -----------------------------------------------------------------------------
 modsize_decided <- 6
 
 ## -----------------------------------------------------------------------------
-suggest_size(cvvs)
+suggest_size(cvvs, stat = "mlpd")
+# We are using the same seed as in the plot() call above to ensure that the
+# bootstrap intervals are exactly the same:
+suggest_size(cvvs, stat = "rmse", seed = 54548)
 
 ## -----------------------------------------------------------------------------
-cvvs
-### Alternative modifying the number of printed decimal places:
-# print(cvvs, digits = 2)
-### 
+print(summary(cvvs, stats = c("mlpd", "rmse"), deltas = TRUE, seed = 54548),
+      digits = 1)
 
 ## -----------------------------------------------------------------------------
 ( soltrms <- solution_terms(cvvs) )
@@ -102,12 +103,14 @@ prj_mat <- as.matrix(prj)
 ## -----------------------------------------------------------------------------
 library(posterior)
 prj_drws <- as_draws_matrix(prj_mat)
-# In the following call, as.data.frame() is used only because pkgdown
-# versions > 1.6.1 don't print the tibble correctly.
-as.data.frame(summarize_draws(
+prj_smmry <- summarize_draws(
   prj_drws,
   "median", "mad", function(x) quantile(x, probs = c(0.025, 0.975))
-))
+)
+# Coerce to a `data.frame` because pkgdown versions > 1.6.1 don't print the
+# tibble correctly:
+prj_smmry <- as.data.frame(prj_smmry)
+print(prj_smmry, digits = 1)
 
 ## -----------------------------------------------------------------------------
 library(bayesplot)
@@ -133,7 +136,7 @@ cbind(dat_gauss_new, linpred = as.vector(prj_linpred$pred))
 ## -----------------------------------------------------------------------------
 prj_predict <- proj_predict(prj, .seed = 762805)
 # Using the 'bayesplot' package:
-ppc_dens_overlay(y = dat_gauss$y, yrep = prj_predict, alpha = 0.9, bw = "SJ")
+ppc_dens_overlay(y = dat_gauss$y, yrep = prj_predict)
 
 ## ---- eval=FALSE--------------------------------------------------------------
 #  data("VerbAgg", package = "lme4")

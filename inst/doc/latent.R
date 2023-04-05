@@ -106,15 +106,15 @@ d_test_lat_poiss <- list(
   ###
   y_oscale = dat_poiss_test$y
 )
+refm_poiss <- get_refmodel(refm_fit_poiss, latent = TRUE)
 time_lat <- system.time(vs_lat <- varsel(
-  refm_fit_poiss,
+  refm_poiss,
   d_test = d_test_lat_poiss,
   ### Only for the sake of speed (not recommended in general):
   nclusters_pred = 20,
   ###
   nterms_max = 14,
-  seed = 95930,
-  latent = TRUE
+  seed = 95930
 ))
 
 ## -----------------------------------------------------------------------------
@@ -203,17 +203,17 @@ latent_ppd_oscale_nebin <- function(ilpreds_resamp, wobs, cl_ref,
   ppd <- matrix(ppd, nrow = nrow(ilpreds_resamp), ncol = ncol(ilpreds_resamp))
   return(ppd)
 }
+refm_nebin <- get_refmodel(refm_fit_nebin, latent = TRUE,
+                           latent_ll_oscale = latent_ll_oscale_nebin,
+                           latent_ppd_oscale = latent_ppd_oscale_nebin)
 vs_lat_nebin <- varsel(
-  refm_fit_nebin,
+  refm_nebin,
   d_test = d_test_lat_poiss,
   ### Only for the sake of speed (not recommended in general):
   nclusters_pred = 20,
   ###
   nterms_max = 14,
-  seed = 95930,
-  latent = TRUE,
-  latent_ll_oscale = latent_ll_oscale_nebin,
-  latent_ppd_oscale = latent_ppd_oscale_nebin
+  seed = 95930
 )
 
 ## ---- fig.width = 6, out.width = "75%"----------------------------------------
