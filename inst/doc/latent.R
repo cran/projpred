@@ -11,16 +11,15 @@ knitr::opts_chunk$set(
   out.width = "60%",
   fig.align = "center",
   comment = NA,
-  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE,
-  message = FALSE,
-  warning = FALSE
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 
-## -----------------------------------------------------------------------------
+## ----dat_poiss----------------------------------------------------------------
 # Number of observations in the training dataset (= number of observations in
 # the test dataset):
 N <- 71
-sim_poiss <- function(nobs = 2 * N, ncon = 10, ngrpPL = 4, nnoise = 39) {
+# Data-generating function:
+sim_poiss <- function(nobs = 2 * N, ncon = 10, ncats = 4, nnoise = 39) {
   # Regression coefficients for continuous predictors:
   coefs_con <- rnorm(ncon)
   # Continuous predictors:
@@ -28,16 +27,16 @@ sim_poiss <- function(nobs = 2 * N, ncon = 10, ngrpPL = 4, nnoise = 39) {
   # Start linear predictor:
   linpred <- 2.1 + dat_sim %*% coefs_con
   
-  # Population-level (PL) categorical predictor:
+  # Categorical predictor:
   dat_sim <- data.frame(
     x = dat_sim,
-    grpPL = gl(n = ngrpPL, k = nobs %/% ngrpPL, length = nobs,
-               labels = paste0("grpPL", seq_len(ngrpPL)))
+    xcat = gl(n = ncats, k = nobs %/% ncats, length = nobs,
+              labels = paste0("cat", seq_len(ncats)))
   )
-  # Regression coefficients for the PL categorical predictor:
-  coefs_catPL <- rnorm(ngrpPL)
+  # Regression coefficients for the categorical predictor:
+  coefs_cat <- rnorm(ncats)
   # Continue linear predictor:
-  linpred <- linpred + coefs_catPL[dat_sim$grpPL]
+  linpred <- linpred + coefs_cat[dat_sim$xcat]
   
   # Noise predictors:
   dat_sim <- data.frame(
@@ -53,15 +52,18 @@ sim_poiss <- function(nobs = 2 * N, ncon = 10, ngrpPL = 4, nnoise = 39) {
   rownames(dat_sim) <- NULL
   return(dat_sim)
 }
+# Generate data:
 set.seed(300417)
 dat_poiss <- sim_poiss()
-dat_poiss_train <- dat_poiss[1:N, , drop = FALSE]
-dat_poiss_test <- dat_poiss[(N + 1):nrow(dat_poiss), , drop = FALSE]
+dat_poiss_train <- head(dat_poiss, N)
+dat_poiss_test <- tail(dat_poiss, N)
 
-## -----------------------------------------------------------------------------
+## ----rstanarm_attach, message=FALSE-------------------------------------------
 library(rstanarm)
+
+## ----ref_fit_poiss------------------------------------------------------------
 # Number of regression coefficients:
-( D <- sum(grepl("^x|^grpPL", names(dat_poiss_train))) )
+( D <- sum(grepl("^x", names(dat_poiss_train))) )
 # Prior guess for the number of relevant (i.e., non-zero) regression
 # coefficients:
 p0 <- 10
@@ -78,7 +80,7 @@ ncores <- min(ncores, 2L)
 ###
 options(mc.cores = ncores)
 refm_fml <- as.formula(paste("y", "~", paste(
-  grep("^x|^grpPL", names(dat_poiss_train), value = TRUE),
+  grep("^x", names(dat_poiss_train), value = TRUE),
   collapse = " + "
 )))
 refm_fit_poiss <- stan_glm(
@@ -87,15 +89,15 @@ refm_fit_poiss <- stan_glm(
   data = dat_poiss_train,
   prior = hs(global_scale = tau0, slab_df = 100, slab_scale = 1),
   ### Only for the sake of speed (not recommended in general):
-  chains = 2, iter = 500,
+  chains = 2, iter = 1000,
   ###
-  seed = 7286013, QR = TRUE, refresh = 0
+  QR = TRUE, refresh = 0
 )
 
-## -----------------------------------------------------------------------------
+## ----projpred_attach, message=FALSE-------------------------------------------
 library(projpred)
 
-## ---- results='hide', message=TRUE--------------------------------------------
+## ----vs_lat-------------------------------------------------------------------
 d_test_lat_poiss <- list(
   data = dat_poiss_test,
   offset = rep(0, nrow(dat_poiss_test)),
@@ -114,37 +116,39 @@ time_lat <- system.time(vs_lat <- varsel(
   nclusters_pred = 20,
   ###
   nterms_max = 14,
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE,
+  ###
+  ### For comparability with varsel() based on the traditional projection:
   seed = 95930
+  ###
 ))
 
-## -----------------------------------------------------------------------------
+## ----time_lat-----------------------------------------------------------------
 print(time_lat)
 
-## ---- fig.width = 6, out.width = "75%"----------------------------------------
+## ----plot_vsel_lat, fig.width = 6, out.width = "75%"--------------------------
 ( gg_lat <- plot(vs_lat, stats = "mlpd", deltas = TRUE) )
 
-## ---- fig.width = 6, out.width = "75%"----------------------------------------
+## ----plot_vsel_lat_zoom, fig.width = 6, out.width = "75%"---------------------
 gg_lat + ggplot2::coord_cartesian(ylim = c(-10, 0.05))
 
-## -----------------------------------------------------------------------------
-modsize_decided_lat <- 11
+## ----size_man_lat-------------------------------------------------------------
+size_decided_lat <- 12
 
-## -----------------------------------------------------------------------------
+## ----size_sgg_lat-------------------------------------------------------------
 suggest_size(vs_lat, stat = "mlpd")
 
-## -----------------------------------------------------------------------------
-smmry_lat <- summary(
-  vs_lat,
-  stats = "mlpd",
-  type = c("mean", "se", "lower", "upper", "diff", "diff.se")
-)
-print(smmry_lat, digits = 3)
+## ----smmry_vsel_lat-----------------------------------------------------------
+smmry_lat <- summary(vs_lat, stats = "mlpd",
+                     type = c("mean", "lower", "upper", "diff"))
+print(smmry_lat, digits = 2)
 
-## -----------------------------------------------------------------------------
-soltrms_lat <- solution_terms(vs_lat)
-( soltrms_lat_final <- head(soltrms_lat, modsize_decided_lat) )
+## ----predictors_final_lat-----------------------------------------------------
+rk_lat <- ranking(vs_lat)
+( predictors_final_lat <- head(rk_lat[["fulldata"]], size_decided_lat) )
 
-## ---- results='hide'----------------------------------------------------------
+## ----vs_trad------------------------------------------------------------------
 d_test_trad_poiss <- d_test_lat_poiss
 d_test_trad_poiss$y <- d_test_trad_poiss$y_oscale
 d_test_trad_poiss$y_oscale <- NULL
@@ -155,32 +159,34 @@ time_trad <- system.time(vs_trad <- varsel(
   nclusters_pred = 20,
   ###
   nterms_max = 14,
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE,
+  ###
+  ### For comparability with varsel() based on the latent projection:
   seed = 95930
+  ###
 ))
 
-## -----------------------------------------------------------------------------
+## ----post_vs_trad-------------------------------------------------------------
 print(time_trad)
 ( gg_trad <- plot(vs_trad, stats = "mlpd", deltas = TRUE) )
-smmry_trad <- summary(
-  vs_trad,
-  stats = "mlpd",
-  type = c("mean", "se", "lower", "upper", "diff", "diff.se")
-)
-print(smmry_trad, digits = 3)
+smmry_trad <- summary(vs_trad, stats = "mlpd",
+                      type = c("mean", "lower", "upper", "diff"))
+print(smmry_trad, digits = 2)
 
-## -----------------------------------------------------------------------------
+## ----ref_fit_nebin------------------------------------------------------------
 refm_fit_nebin <- stan_glm(
   formula = refm_fml,
   family = neg_binomial_2(),
   data = dat_poiss_train,
   prior = hs(global_scale = tau0, slab_df = 100, slab_scale = 1),
   ### Only for the sake of speed (not recommended in general):
-  chains = 2, iter = 500,
+  chains = 2, iter = 1000,
   ###
-  seed = 7304, QR = TRUE, refresh = 0
+  QR = TRUE, refresh = 0
 )
 
-## ---- results='hide', message=TRUE--------------------------------------------
+## ----vs_nebin-----------------------------------------------------------------
 refm_prec <- as.matrix(refm_fit_nebin)[, "reciprocal_dispersion", drop = FALSE]
 latent_ll_oscale_nebin <- function(ilpreds, y_oscale,
                                    wobs = rep(1, length(y_oscale)), cl_ref,
@@ -206,38 +212,37 @@ latent_ppd_oscale_nebin <- function(ilpreds_resamp, wobs, cl_ref,
 refm_nebin <- get_refmodel(refm_fit_nebin, latent = TRUE,
                            latent_ll_oscale = latent_ll_oscale_nebin,
                            latent_ppd_oscale = latent_ppd_oscale_nebin)
-vs_lat_nebin <- varsel(
+vs_nebin <- varsel(
   refm_nebin,
   d_test = d_test_lat_poiss,
   ### Only for the sake of speed (not recommended in general):
   nclusters_pred = 20,
   ###
   nterms_max = 14,
-  seed = 95930
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE
+  ###
 )
 
-## ---- fig.width = 6, out.width = "75%"----------------------------------------
-( gg_lat_nebin <- plot(vs_lat_nebin, stats = "mlpd", deltas = TRUE) )
+## ----plot_vsel_nebin, fig.width = 6, out.width = "75%"------------------------
+( gg_nebin <- plot(vs_nebin, stats = "mlpd", deltas = TRUE) )
 
-## ---- fig.width = 6, out.width = "75%"----------------------------------------
-gg_lat_nebin + ggplot2::coord_cartesian(ylim = c(-2.5, 0.25))
+## ----plot_vsel_nebin_zoom, fig.width = 6, out.width = "75%"-------------------
+gg_nebin + ggplot2::coord_cartesian(ylim = c(-2.5, 0.25))
 
-## -----------------------------------------------------------------------------
-modsize_decided_lat_nebin <- 11
+## ----size_man_nebin-----------------------------------------------------------
+size_decided_nebin <- 11
 
-## -----------------------------------------------------------------------------
-suggest_size(vs_lat_nebin, stat = "mlpd")
+## ----size_sgg_nebin-----------------------------------------------------------
+suggest_size(vs_nebin, stat = "mlpd")
 
-## -----------------------------------------------------------------------------
-smmry_lat_nebin <- summary(
-  vs_lat_nebin,
-  stats = "mlpd",
-  type = c("mean", "se", "lower", "upper", "diff", "diff.se")
-)
-print(smmry_lat_nebin, digits = 3)
+## ----smmry_vsel_nebin---------------------------------------------------------
+smmry_nebin <- summary(vs_nebin, stats = "mlpd",
+                       type = c("mean", "lower", "upper", "diff"))
+print(smmry_nebin, digits = 2)
 
-## -----------------------------------------------------------------------------
-soltrms_lat_nebin <- solution_terms(vs_lat_nebin)
-( soltrms_lat_nebin_final <- head(soltrms_lat_nebin,
-                                  modsize_decided_lat_nebin) )
+## ----predictors_final_nebin---------------------------------------------------
+rk_nebin <- ranking(vs_nebin)
+( predictors_final_nebin <- head(rk_nebin[["fulldata"]],
+                                 size_decided_nebin) )
 

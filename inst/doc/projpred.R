@@ -11,23 +11,19 @@ knitr::opts_chunk$set(
   out.width = "60%",
   fig.align = "center",
   comment = NA,
-  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE,
-  message = FALSE,
-  warning = FALSE
+  eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
 )
 
-## -----------------------------------------------------------------------------
+## ----data---------------------------------------------------------------------
 data("df_gaussian", package = "projpred")
 dat_gauss <- data.frame(y = df_gaussian$y, df_gaussian$x)
 
-## -----------------------------------------------------------------------------
+## ----rstanarm_attach, message=FALSE-------------------------------------------
 library(rstanarm)
 
-## -----------------------------------------------------------------------------
+## ----rh-----------------------------------------------------------------------
 # Number of regression coefficients:
 ( D <- sum(grepl("^X", names(dat_gauss))) )
-
-## -----------------------------------------------------------------------------
 # Prior guess for the number of relevant (i.e., non-zero) regression
 # coefficients:
 p0 <- 5
@@ -38,7 +34,7 @@ N <- nrow(dat_gauss)
 # standard deviation):
 tau0 <- p0 / (D - p0) * 1 / sqrt(N)
 
-## -----------------------------------------------------------------------------
+## ----ref_fit------------------------------------------------------------------
 # Set this manually if desired:
 ncores <- parallel::detectCores(logical = FALSE)
 ### Only for technical reasons in this vignette (you can omit this when running
@@ -46,6 +42,7 @@ ncores <- parallel::detectCores(logical = FALSE)
 ncores <- min(ncores, 2L)
 ###
 options(mc.cores = ncores)
+set.seed(5075801)
 refm_fit <- stan_glm(
   y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 +
     X15 + X16 + X17 + X18 + X19 + X20,
@@ -53,55 +50,88 @@ refm_fit <- stan_glm(
   data = dat_gauss,
   prior = hs(global_scale = tau0),
   ### Only for the sake of speed (not recommended in general):
-  chains = 2, iter = 500,
+  chains = 2, iter = 1000,
   ###
-  seed = 2052109, QR = TRUE, refresh = 0
+  QR = TRUE, refresh = 0
 )
 
-## -----------------------------------------------------------------------------
+## ----projpred_attach, message=FALSE-------------------------------------------
 library(projpred)
 
-## ---- results='hide'----------------------------------------------------------
+## ----cv_varsel_fast-----------------------------------------------------------
+# Preliminary cv_varsel() run:
+cvvs_fast <- cv_varsel(
+  refm_fit,
+  validate_search = FALSE,
+  ### Only for the sake of speed (not recommended in general):
+  nclusters_pred = 20,
+  ###
+  nterms_max = 20,
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE
+  ### 
+)
+
+## ----plot_vsel_fast-----------------------------------------------------------
+plot(cvvs_fast, stats = "mlpd", ranking_nterms_max = NA)
+
+## ----cv_varsel, message=FALSE-------------------------------------------------
+# Final cv_varsel() run:
 cvvs <- cv_varsel(
   refm_fit,
+  cv_method = "kfold",
   ### Only for the sake of speed (not recommended in general):
-  validate_search = FALSE,
+  K = 2,
   nclusters_pred = 20,
   ###
   nterms_max = 9,
-  seed = 411183
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE
+  ### 
 )
 
-## ---- fig.asp=1.5 * 0.618-----------------------------------------------------
-plot(cvvs, stats = c("mlpd", "rmse"), deltas = TRUE, seed = 54548)
+## ----plot_vsel, fig.width=6, out.width="80%"----------------------------------
+plot(cvvs, stats = "mlpd", deltas = TRUE)
 
-## -----------------------------------------------------------------------------
-modsize_decided <- 6
+## ----size_man-----------------------------------------------------------------
+size_decided <- 6
 
-## -----------------------------------------------------------------------------
+## ----size_sgg-----------------------------------------------------------------
 suggest_size(cvvs, stat = "mlpd")
-# We are using the same seed as in the plot() call above to ensure that the
-# bootstrap intervals are exactly the same:
-suggest_size(cvvs, stat = "rmse", seed = 54548)
 
-## -----------------------------------------------------------------------------
-print(summary(cvvs, stats = c("mlpd", "rmse"), deltas = TRUE, seed = 54548),
-      digits = 1)
+## ----smmry_vsel---------------------------------------------------------------
+smmry <- summary(cvvs, stats = "mlpd", type = c("mean", "lower", "upper"),
+                 deltas = TRUE)
+print(smmry, digits = 1)
 
-## -----------------------------------------------------------------------------
-( soltrms <- solution_terms(cvvs) )
+## ----ranking------------------------------------------------------------------
+rk <- ranking(cvvs)
 
-## -----------------------------------------------------------------------------
-( soltrms_final <- head(soltrms, modsize_decided) )
+## ----cv_proportions-----------------------------------------------------------
+( pr_rk <- cv_proportions(rk) )
 
-## -----------------------------------------------------------------------------
-prj <- project(refm_fit, solution_terms = soltrms_final)
+## ----ranking_fulldata---------------------------------------------------------
+rk[["fulldata"]]
 
-## -----------------------------------------------------------------------------
+## ----plot_cv_proportions, fig.width=6, out.width="80%"------------------------
+plot(pr_rk)
+
+## ----predictors_final---------------------------------------------------------
+( predictors_final <- head(rk[["fulldata"]], size_decided) )
+
+## ----plot_cv_proportions_cumul, fig.width=6, out.width="80%"------------------
+plot(cv_proportions(rk, cumulate = TRUE))
+
+## ----project------------------------------------------------------------------
+prj <- project(refm_fit, solution_terms = predictors_final)
+
+## ----as_matrix_prj------------------------------------------------------------
 prj_mat <- as.matrix(prj)
 
-## -----------------------------------------------------------------------------
+## ----posterior_attach, message=FALSE------------------------------------------
 library(posterior)
+
+## ----smmry_prj----------------------------------------------------------------
 prj_drws <- as_draws_matrix(prj_mat)
 prj_smmry <- summarize_draws(
   prj_drws,
@@ -112,42 +142,44 @@ prj_smmry <- summarize_draws(
 prj_smmry <- as.data.frame(prj_smmry)
 print(prj_smmry, digits = 1)
 
-## -----------------------------------------------------------------------------
+## ----bayesplot_attach, message=FALSE------------------------------------------
 library(bayesplot)
+
+## ----bayesplot_prj------------------------------------------------------------
 bayesplot_theme_set(ggplot2::theme_bw())
 mcmc_intervals(prj_mat) +
   ggplot2::coord_cartesian(xlim = c(-1.5, 1.6))
 
-## -----------------------------------------------------------------------------
+## ----bayesplot_ref------------------------------------------------------------
 refm_mat <- as.matrix(refm_fit)
 mcmc_intervals(refm_mat, pars = colnames(prj_mat)) +
   ggplot2::coord_cartesian(xlim = c(-1.5, 1.6))
 
-## -----------------------------------------------------------------------------
+## ----data_new-----------------------------------------------------------------
 ( dat_gauss_new <- setNames(
-  as.data.frame(replicate(length(soltrms_final), c(-1, 0, 1))),
-  soltrms_final
+  as.data.frame(replicate(length(predictors_final), c(-1, 0, 1))),
+  predictors_final
 ) )
 
-## -----------------------------------------------------------------------------
+## ----proj_linpred-------------------------------------------------------------
 prj_linpred <- proj_linpred(prj, newdata = dat_gauss_new, integrated = TRUE)
 cbind(dat_gauss_new, linpred = as.vector(prj_linpred$pred))
 
-## -----------------------------------------------------------------------------
-prj_predict <- proj_predict(prj, .seed = 762805)
+## ----proj_predict-------------------------------------------------------------
+prj_predict <- proj_predict(prj)
 # Using the 'bayesplot' package:
 ppc_dens_overlay(y = dat_gauss$y, yrep = prj_predict)
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----ref_fit_mlvl, eval=FALSE-------------------------------------------------
 #  data("VerbAgg", package = "lme4")
 #  refm_fit <- stan_glmer(
 #    r2 ~ btype + situ + mode + (btype + situ + mode | id),
 #    family = binomial(),
 #    data = VerbAgg,
-#    seed = 82616169, QR = TRUE, refresh = 0
+#    QR = TRUE, refresh = 0
 #  )
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----ref_fit_addv, eval=FALSE-------------------------------------------------
 #  data("lasrosas.corn", package = "agridat")
 #  # Convert `year` to a `factor` (this could also be solved by using
 #  # `factor(year)` in the formula, but we avoid that here to put more emphasis on
@@ -157,16 +189,16 @@ ppc_dens_overlay(y = dat_gauss$y, yrep = prj_predict)
 #    yield ~ year + topo + t2(nitro, bv),
 #    family = gaussian(),
 #    data = lasrosas.corn,
-#    seed = 4919670, QR = TRUE, refresh = 0
+#    QR = TRUE, refresh = 0
 #  )
 
-## ---- eval=FALSE--------------------------------------------------------------
+## ----ref_fit_addv_mlvl, eval=FALSE--------------------------------------------
 #  data("gumpertz.pepper", package = "agridat")
 #  refm_fit <- stan_gamm4(
 #    disease ~ field + leaf + s(water),
 #    random = ~ (1 | row) + (1 | quadrat),
 #    family = binomial(),
 #    data = gumpertz.pepper,
-#    seed = 14209013, QR = TRUE, refresh = 0
+#    QR = TRUE, refresh = 0
 #  )
 
