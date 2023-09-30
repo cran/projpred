@@ -1,14 +1,14 @@
 params <-
 list(EVAL = TRUE)
 
-## ---- SETTINGS-knitr, include=FALSE-------------------------------------------
+## ----SETTINGS-knitr, include=FALSE--------------------------------------------
 stopifnot(require(knitr))
 knitr::opts_chunk$set(
   dev = "png",
   dpi = 150,
   fig.asp = 0.618,
-  fig.width = 5,
-  out.width = "60%",
+  fig.width = 7,
+  out.width = "90%",
   fig.align = "center",
   comment = NA,
   eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
@@ -42,7 +42,7 @@ ncores <- parallel::detectCores(logical = FALSE)
 ncores <- min(ncores, 2L)
 ###
 options(mc.cores = ncores)
-set.seed(5075801)
+set.seed(507801)
 refm_fit <- stan_glm(
   y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 +
     X15 + X16 + X17 + X18 + X19 + X20,
@@ -64,6 +64,7 @@ cvvs_fast <- cv_varsel(
   refm_fit,
   validate_search = FALSE,
   ### Only for the sake of speed (not recommended in general):
+  method = "L1",
   nclusters_pred = 20,
   ###
   nterms_max = 20,
@@ -76,21 +77,28 @@ cvvs_fast <- cv_varsel(
 plot(cvvs_fast, stats = "mlpd", ranking_nterms_max = NA)
 
 ## ----cv_varsel, message=FALSE-------------------------------------------------
+# For the CV parallelization (cv_varsel()'s argument `parallel`):
+doParallel::registerDoParallel(ncores)
 # Final cv_varsel() run:
 cvvs <- cv_varsel(
   refm_fit,
   cv_method = "kfold",
   ### Only for the sake of speed (not recommended in general):
   K = 2,
+  method = "L1",
   nclusters_pred = 20,
   ###
   nterms_max = 9,
+  parallel = TRUE,
   ### In interactive use, we recommend not to deactivate the verbose mode:
   verbose = FALSE
   ### 
 )
+# Tear down the CV parallelization setup:
+doParallel::stopImplicitCluster()
+foreach::registerDoSEQ()
 
-## ----plot_vsel, fig.width=6, out.width="80%"----------------------------------
+## ----plot_vsel----------------------------------------------------------------
 plot(cvvs, stats = "mlpd", deltas = TRUE)
 
 ## ----size_man-----------------------------------------------------------------
@@ -113,17 +121,23 @@ rk <- ranking(cvvs)
 ## ----ranking_fulldata---------------------------------------------------------
 rk[["fulldata"]]
 
-## ----plot_cv_proportions, fig.width=6, out.width="80%"------------------------
+## ----plot_cv_proportions------------------------------------------------------
 plot(pr_rk)
 
 ## ----predictors_final---------------------------------------------------------
 ( predictors_final <- head(rk[["fulldata"]], size_decided) )
 
-## ----plot_cv_proportions_cumul, fig.width=6, out.width="80%"------------------
+## ----plot_cv_proportions_cumul------------------------------------------------
 plot(cv_proportions(rk, cumulate = TRUE))
 
 ## ----project------------------------------------------------------------------
-prj <- project(refm_fit, solution_terms = predictors_final)
+prj <- project(
+  refm_fit,
+  solution_terms = predictors_final,
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE
+  ###
+)
 
 ## ----as_matrix_prj------------------------------------------------------------
 prj_mat <- as.matrix(prj)

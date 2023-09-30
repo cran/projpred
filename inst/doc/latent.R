@@ -1,14 +1,14 @@
 params <-
 list(EVAL = TRUE)
 
-## ---- SETTINGS-knitr, include=FALSE-------------------------------------------
+## ----SETTINGS-knitr, include=FALSE--------------------------------------------
 stopifnot(require(knitr))
 knitr::opts_chunk$set(
   dev = "png",
   dpi = 150,
   fig.asp = 0.618,
-  fig.width = 5,
-  out.width = "60%",
+  fig.width = 7,
+  out.width = "90%",
   fig.align = "center",
   comment = NA,
   eval = if (isTRUE(exists("params"))) params$EVAL else FALSE
@@ -112,6 +112,10 @@ refm_poiss <- get_refmodel(refm_fit_poiss, latent = TRUE)
 time_lat <- system.time(vs_lat <- varsel(
   refm_poiss,
   d_test = d_test_lat_poiss,
+  ### Only for demonstrating an issue with the traditional projection in the
+  ### next step (not recommended in general):
+  method = "L1",
+  ###
   ### Only for the sake of speed (not recommended in general):
   nclusters_pred = 20,
   ###
@@ -127,10 +131,10 @@ time_lat <- system.time(vs_lat <- varsel(
 ## ----time_lat-----------------------------------------------------------------
 print(time_lat)
 
-## ----plot_vsel_lat, fig.width = 6, out.width = "75%"--------------------------
+## ----plot_vsel_lat------------------------------------------------------------
 ( gg_lat <- plot(vs_lat, stats = "mlpd", deltas = TRUE) )
 
-## ----plot_vsel_lat_zoom, fig.width = 6, out.width = "75%"---------------------
+## ----plot_vsel_lat_zoom-------------------------------------------------------
 gg_lat + ggplot2::coord_cartesian(ylim = c(-10, 0.05))
 
 ## ----size_man_lat-------------------------------------------------------------
@@ -148,6 +152,9 @@ print(smmry_lat, digits = 2)
 rk_lat <- ranking(vs_lat)
 ( predictors_final_lat <- head(rk_lat[["fulldata"]], size_decided_lat) )
 
+## ----suppress_warn_poiss, include=FALSE---------------------------------------
+warn_instable_orig <- options(projpred.warn_instable_projections = FALSE)
+
 ## ----vs_trad------------------------------------------------------------------
 d_test_trad_poiss <- d_test_lat_poiss
 d_test_trad_poiss$y <- d_test_trad_poiss$y_oscale
@@ -155,6 +162,10 @@ d_test_trad_poiss$y_oscale <- NULL
 time_trad <- system.time(vs_trad <- varsel(
   refm_fit_poiss,
   d_test = d_test_trad_poiss,
+  ### Only for demonstrating an issue with the traditional projection (not
+  ### recommended in general):
+  method = "L1",
+  ###
   ### Only for the sake of speed (not recommended in general):
   nclusters_pred = 20,
   ###
@@ -166,6 +177,10 @@ time_trad <- system.time(vs_trad <- varsel(
   seed = 95930
   ###
 ))
+
+## ----unsuppress_warn_poiss, include=FALSE-------------------------------------
+options(warn_instable_orig)
+rm(warn_instable_orig)
 
 ## ----post_vs_trad-------------------------------------------------------------
 print(time_trad)
@@ -216,6 +231,7 @@ vs_nebin <- varsel(
   refm_nebin,
   d_test = d_test_lat_poiss,
   ### Only for the sake of speed (not recommended in general):
+  method = "L1",
   nclusters_pred = 20,
   ###
   nterms_max = 14,
@@ -224,10 +240,10 @@ vs_nebin <- varsel(
   ###
 )
 
-## ----plot_vsel_nebin, fig.width = 6, out.width = "75%"------------------------
+## ----plot_vsel_nebin----------------------------------------------------------
 ( gg_nebin <- plot(vs_nebin, stats = "mlpd", deltas = TRUE) )
 
-## ----plot_vsel_nebin_zoom, fig.width = 6, out.width = "75%"-------------------
+## ----plot_vsel_nebin_zoom-----------------------------------------------------
 gg_nebin + ggplot2::coord_cartesian(ylim = c(-2.5, 0.25))
 
 ## ----size_man_nebin-----------------------------------------------------------
