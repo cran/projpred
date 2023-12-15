@@ -42,7 +42,7 @@ ncores <- parallel::detectCores(logical = FALSE)
 ncores <- min(ncores, 2L)
 ###
 options(mc.cores = ncores)
-set.seed(507801)
+set.seed(5078022)
 refm_fit <- stan_glm(
   y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 +
     X15 + X16 + X17 + X18 + X19 + X20,
@@ -58,14 +58,17 @@ refm_fit <- stan_glm(
 ## ----projpred_attach, message=FALSE-------------------------------------------
 library(projpred)
 
+## ----refmodel_create----------------------------------------------------------
+refm_obj <- get_refmodel(refm_fit)
+
 ## ----cv_varsel_fast-----------------------------------------------------------
 # Preliminary cv_varsel() run:
 cvvs_fast <- cv_varsel(
-  refm_fit,
+  refm_obj,
   validate_search = FALSE,
   ### Only for the sake of speed (not recommended in general):
   method = "L1",
-  nclusters_pred = 20,
+  refit_prj = FALSE,
   ###
   nterms_max = 20,
   ### In interactive use, we recommend not to deactivate the verbose mode:
@@ -76,15 +79,37 @@ cvvs_fast <- cv_varsel(
 ## ----plot_vsel_fast-----------------------------------------------------------
 plot(cvvs_fast, stats = "mlpd", ranking_nterms_max = NA)
 
+## ----cv_varsel_fast_refit-----------------------------------------------------
+# Preliminary cv_varsel() run with `refit_prj = TRUE`:
+cvvs_fast_refit <- cv_varsel(
+  cvvs_fast,
+  ### Only for the sake of speed (not recommended in general):
+  nclusters_pred = 20,
+  ###
+  ### In interactive use, we recommend not to deactivate the verbose mode:
+  verbose = FALSE
+  ### 
+)
+
+## ----plot_vsel_fast_refit-----------------------------------------------------
+plot(cvvs_fast_refit, stats = "mlpd", ranking_nterms_max = NA)
+
 ## ----cv_varsel, message=FALSE-------------------------------------------------
-# For the CV parallelization (cv_varsel()'s argument `parallel`):
+# Refit the reference model K times:
+cv_fits <- run_cvfun(
+  refm_obj,
+  ### Only for the sake of speed (not recommended in general):
+  K = 2
+  ###
+)
+# For running projpred's CV in parallel (see cv_varsel()'s argument `parallel`):
 doParallel::registerDoParallel(ncores)
 # Final cv_varsel() run:
 cvvs <- cv_varsel(
-  refm_fit,
+  refm_obj,
   cv_method = "kfold",
+  cvfits = cv_fits,
   ### Only for the sake of speed (not recommended in general):
-  K = 2,
   method = "L1",
   nclusters_pred = 20,
   ###
@@ -132,8 +157,8 @@ plot(cv_proportions(rk, cumulate = TRUE))
 
 ## ----project------------------------------------------------------------------
 prj <- project(
-  refm_fit,
-  solution_terms = predictors_final,
+  refm_obj,
+  predictor_terms = predictors_final,
   ### In interactive use, we recommend not to deactivate the verbose mode:
   verbose = FALSE
   ###
