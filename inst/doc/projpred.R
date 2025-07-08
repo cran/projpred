@@ -42,7 +42,7 @@ ncores <- parallel::detectCores(logical = FALSE)
 ncores <- min(ncores, 2L)
 ###
 options(mc.cores = ncores)
-set.seed(5078022)
+set.seed(50780)
 refm_fit <- stan_glm(
   y ~ X1 + X2 + X3 + X4 + X5 + X6 + X7 + X8 + X9 + X10 + X11 + X12 + X13 + X14 +
     X15 + X16 + X17 + X18 + X19 + X20,
@@ -52,7 +52,7 @@ refm_fit <- stan_glm(
   ### Only for the sake of speed (not recommended in general):
   chains = 2, iter = 1000,
   ###
-  QR = TRUE, refresh = 0
+  refresh = 0
 )
 
 ## ----projpred_attach, message=FALSE-------------------------------------------
@@ -72,11 +72,13 @@ cvvs_fast <- cv_varsel(
   ###
   nterms_max = 20,
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE
+  verbose = 0
   ### 
 )
 
 ## ----plot_vsel_fast-----------------------------------------------------------
+options(projpred.plot_vsel_size_position = "primary_x_bottom")
+options(projpred.plot_vsel_text_angle = 0)
 plot(cvvs_fast, stats = "mlpd", ranking_nterms_max = NA)
 
 ## ----cv_varsel_fast_refit-----------------------------------------------------
@@ -87,7 +89,7 @@ cvvs_fast_refit <- cv_varsel(
   nclusters_pred = 20,
   ###
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE
+  verbose = 0
   ### 
 )
 
@@ -116,7 +118,7 @@ cvvs <- cv_varsel(
   nterms_max = 9,
   parallel = TRUE,
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE
+  verbose = 0
   ### 
 )
 # Tear down the CV parallelization setup:
@@ -124,18 +126,25 @@ doParallel::stopImplicitCluster()
 foreach::registerDoSEQ()
 
 ## ----plot_vsel----------------------------------------------------------------
+options(projpred.plot_vsel_show_cv_proportions = TRUE)
 plot(cvvs, stats = "mlpd", deltas = TRUE)
 
 ## ----size_man-----------------------------------------------------------------
-size_decided <- 6
+size_decided <- 7
 
 ## ----size_sgg-----------------------------------------------------------------
 suggest_size(cvvs, stat = "mlpd")
 
 ## ----smmry_vsel---------------------------------------------------------------
-smmry <- summary(cvvs, stats = "mlpd", type = c("mean", "lower", "upper"),
+smmry <- summary(cvvs,
+                 stats = "mlpd",
+                 type = c("mean", "lower", "upper"),
                  deltas = TRUE)
 print(smmry, digits = 1)
+
+## ----perf_smmry---------------------------------------------------------------
+perf <- performances(smmry)
+str(perf)
 
 ## ----ranking------------------------------------------------------------------
 rk <- ranking(cvvs)
@@ -160,7 +169,7 @@ prj <- project(
   refm_obj,
   predictor_terms = predictors_final,
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE
+  verbose = 0
   ###
 )
 
@@ -176,7 +185,7 @@ prj_smmry <- summarize_draws(
   prj_drws,
   "median", "mad", function(x) quantile(x, probs = c(0.025, 0.975))
 )
-# Coerce to a `data.frame` because pkgdown versions > 1.6.1 don't print the
+# Coerce to a `data.frame` because some pkgdown versions don't print the
 # tibble correctly:
 prj_smmry <- as.data.frame(prj_smmry)
 print(prj_smmry, digits = 1)
@@ -202,7 +211,7 @@ mcmc_intervals(refm_mat, pars = colnames(prj_mat)) +
 
 ## ----proj_linpred-------------------------------------------------------------
 prj_linpred <- proj_linpred(prj, newdata = dat_gauss_new, integrated = TRUE)
-cbind(dat_gauss_new, linpred = as.vector(prj_linpred$pred))
+cbind(dat_gauss_new, linpred = as.vector(prj_linpred[["pred"]]))
 
 ## ----proj_predict-------------------------------------------------------------
 prj_predict <- proj_predict(prj)
@@ -210,34 +219,34 @@ prj_predict <- proj_predict(prj)
 ppc_dens_overlay(y = dat_gauss$y, yrep = prj_predict)
 
 ## ----ref_fit_mlvl, eval=FALSE-------------------------------------------------
-#  data("VerbAgg", package = "lme4")
-#  refm_fit <- stan_glmer(
-#    r2 ~ btype + situ + mode + (btype + situ + mode | id),
-#    family = binomial(),
-#    data = VerbAgg,
-#    QR = TRUE, refresh = 0
-#  )
+# data("VerbAgg", package = "lme4")
+# refm_fit <- stan_glmer(
+#   r2 ~ btype + situ + mode + (btype + situ + mode | id),
+#   family = binomial(),
+#   data = VerbAgg,
+#   QR = TRUE, refresh = 0
+# )
 
 ## ----ref_fit_addv, eval=FALSE-------------------------------------------------
-#  data("lasrosas.corn", package = "agridat")
-#  # Convert `year` to a `factor` (this could also be solved by using
-#  # `factor(year)` in the formula, but we avoid that here to put more emphasis on
-#  # the demonstration of the smooth term):
-#  lasrosas.corn$year <- as.factor(lasrosas.corn$year)
-#  refm_fit <- stan_gamm4(
-#    yield ~ year + topo + t2(nitro, bv),
-#    family = gaussian(),
-#    data = lasrosas.corn,
-#    QR = TRUE, refresh = 0
-#  )
+# data("lasrosas.corn", package = "agridat")
+# # Convert `year` to a `factor` (this could also be solved by using
+# # `factor(year)` in the formula, but we avoid that here to put more emphasis on
+# # the demonstration of the smooth term):
+# lasrosas.corn$year <- as.factor(lasrosas.corn$year)
+# refm_fit <- stan_gamm4(
+#   yield ~ year + topo + t2(nitro, bv),
+#   family = gaussian(),
+#   data = lasrosas.corn,
+#   QR = TRUE, refresh = 0
+# )
 
 ## ----ref_fit_addv_mlvl, eval=FALSE--------------------------------------------
-#  data("gumpertz.pepper", package = "agridat")
-#  refm_fit <- stan_gamm4(
-#    disease ~ field + leaf + s(water),
-#    random = ~ (1 | row) + (1 | quadrat),
-#    family = binomial(),
-#    data = gumpertz.pepper,
-#    QR = TRUE, refresh = 0
-#  )
+# data("gumpertz.pepper", package = "agridat")
+# refm_fit <- stan_gamm4(
+#   disease ~ field + leaf + s(water),
+#   random = ~ (1 | row) + (1 | quadrat),
+#   family = binomial(),
+#   data = gumpertz.pepper,
+#   QR = TRUE, refresh = 0
+# )
 

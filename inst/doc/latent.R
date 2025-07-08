@@ -91,7 +91,7 @@ refm_fit_poiss <- stan_glm(
   ### Only for the sake of speed (not recommended in general):
   chains = 2, iter = 1000,
   ###
-  QR = TRUE, refresh = 0
+  refresh = 0
 )
 
 ## ----projpred_attach, message=FALSE-------------------------------------------
@@ -121,7 +121,7 @@ time_lat <- system.time(vs_lat <- varsel(
   ###
   nterms_max = 14,
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE,
+  verbose = 0,
   ###
   ### For comparability with varsel() based on the traditional projection:
   seed = 95930
@@ -132,21 +132,14 @@ time_lat <- system.time(vs_lat <- varsel(
 print(time_lat)
 
 ## ----plot_vsel_lat------------------------------------------------------------
-( gg_lat <- plot(vs_lat, stats = "mlpd", deltas = TRUE) )
-
-## ----plot_vsel_lat_zoom-------------------------------------------------------
-gg_lat + ggplot2::coord_cartesian(ylim = c(-10, 0.05))
+options(projpred.plot_vsel_size_position = "secondary_x")
+( gg_lat <- plot(vs_lat, stats = "gmpd", deltas = TRUE) )
 
 ## ----size_man_lat-------------------------------------------------------------
-size_decided_lat <- 12
+size_decided_lat <- 11
 
 ## ----size_sgg_lat-------------------------------------------------------------
-suggest_size(vs_lat, stat = "mlpd")
-
-## ----smmry_vsel_lat-----------------------------------------------------------
-smmry_lat <- summary(vs_lat, stats = "mlpd",
-                     type = c("mean", "lower", "upper", "diff"))
-print(smmry_lat, digits = 2)
+suggest_size(vs_lat, stat = "gmpd")
 
 ## ----predictors_final_lat-----------------------------------------------------
 rk_lat <- ranking(vs_lat)
@@ -169,9 +162,9 @@ time_trad <- system.time(vs_trad <- varsel(
   ### Only for the sake of speed (not recommended in general):
   nclusters_pred = 20,
   ###
-  nterms_max = 14,
+  nterms_max = 30,
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE,
+  verbose = 0,
   ###
   ### For comparability with varsel() based on the latent projection:
   seed = 95930
@@ -184,10 +177,7 @@ rm(warn_instable_orig)
 
 ## ----post_vs_trad-------------------------------------------------------------
 print(time_trad)
-( gg_trad <- plot(vs_trad, stats = "mlpd", deltas = TRUE) )
-smmry_trad <- summary(vs_trad, stats = "mlpd",
-                      type = c("mean", "lower", "upper", "diff"))
-print(smmry_trad, digits = 2)
+( gg_trad <- plot(vs_trad, stats = "gmpd", deltas = TRUE) )
 
 ## ----ref_fit_nebin------------------------------------------------------------
 refm_fit_nebin <- stan_glm(
@@ -198,13 +188,16 @@ refm_fit_nebin <- stan_glm(
   ### Only for the sake of speed (not recommended in general):
   chains = 2, iter = 1000,
   ###
-  QR = TRUE, refresh = 0
+  refresh = 0
 )
 
 ## ----vs_nebin-----------------------------------------------------------------
 refm_prec <- as.matrix(refm_fit_nebin)[, "reciprocal_dispersion", drop = FALSE]
-latent_ll_oscale_nebin <- function(ilpreds, y_oscale,
-                                   wobs = rep(1, length(y_oscale)), cl_ref,
+latent_ll_oscale_nebin <- function(ilpreds,
+                                   dis = rep(NA, nrow(ilpreds)),
+                                   y_oscale,
+                                   wobs = rep(1, length(y_oscale)),
+                                   cl_ref,
                                    wdraws_ref = rep(1, length(cl_ref))) {
   y_oscale_mat <- matrix(y_oscale, nrow = nrow(ilpreds), ncol = ncol(ilpreds),
                          byrow = TRUE)
@@ -214,7 +207,10 @@ latent_ll_oscale_nebin <- function(ilpreds, y_oscale,
   ll_unw <- dnbinom(y_oscale_mat, size = refm_prec_agg, mu = ilpreds, log = TRUE)
   return(wobs_mat * ll_unw)
 }
-latent_ppd_oscale_nebin <- function(ilpreds_resamp, wobs, cl_ref,
+latent_ppd_oscale_nebin <- function(ilpreds_resamp,
+                                    dis_resamp = rep(NA, nrow(ilpreds_resamp)),
+                                    wobs,
+                                    cl_ref,
                                     wdraws_ref = rep(1, length(cl_ref)),
                                     idxs_prjdraws) {
   refm_prec_agg <- cl_agg(refm_prec, cl = cl_ref, wdraws = wdraws_ref)
@@ -236,26 +232,18 @@ vs_nebin <- varsel(
   ###
   nterms_max = 14,
   ### In interactive use, we recommend not to deactivate the verbose mode:
-  verbose = FALSE
+  verbose = 0
   ###
 )
 
 ## ----plot_vsel_nebin----------------------------------------------------------
-( gg_nebin <- plot(vs_nebin, stats = "mlpd", deltas = TRUE) )
-
-## ----plot_vsel_nebin_zoom-----------------------------------------------------
-gg_nebin + ggplot2::coord_cartesian(ylim = c(-2.5, 0.25))
+( gg_nebin <- plot(vs_nebin, stats = "gmpd", deltas = TRUE) )
 
 ## ----size_man_nebin-----------------------------------------------------------
 size_decided_nebin <- 11
 
 ## ----size_sgg_nebin-----------------------------------------------------------
-suggest_size(vs_nebin, stat = "mlpd")
-
-## ----smmry_vsel_nebin---------------------------------------------------------
-smmry_nebin <- summary(vs_nebin, stats = "mlpd",
-                       type = c("mean", "lower", "upper", "diff"))
-print(smmry_nebin, digits = 2)
+suggest_size(vs_nebin, stat = "gmpd")
 
 ## ----predictors_final_nebin---------------------------------------------------
 rk_nebin <- ranking(vs_nebin)
