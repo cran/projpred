@@ -1,8 +1,8 @@
 Package: projpred
 Encoding: UTF-8
 Title: Projection Predictive Feature Selection
-Version: 2.9.0
-Date: 2025-07-08
+Version: 2.9.1
+Date: 2025-10-28
 Authors@R: c(person("Juho", "Piironen", role = c("aut"),
                     email = "juho.t.piironen@gmail.com"),
              person("Markus", "Paasiniemi", role = "aut"),
@@ -52,7 +52,7 @@ LazyData: TRUE
 RoxygenNote: 7.3.2
 VignetteBuilder: knitr, rmarkdown
 NeedsCompilation: yes
-Packaged: 2025-07-08 10:14:01 UTC; frank
+Packaged: 2025-10-28 14:45:25 UTC; osvaldo
 Author: Juho Piironen [aut],
   Markus Paasiniemi [aut],
   Alejandro Catalina [aut],
@@ -70,4 +70,4 @@ Author: Juho Piironen [aut],
   Juho Timonen [ctb]
 Maintainer: Osvaldo Martin <aloctavodia@gmail.com>
 Repository: CRAN
-Date/Publication: 2025-07-08 22:00:02 UTC
+Date/Publication: 2025-10-28 15:10:02 UTC
