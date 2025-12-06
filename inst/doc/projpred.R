@@ -105,7 +105,11 @@ knitr::opts_chunk$set(
 #   ###
 # )
 # # For running projpred's CV in parallel (see cv_varsel()'s argument `parallel`):
-# doParallel::registerDoParallel(ncores)
+# # Note: Parallel processing is disabled during package building to avoid issues
+# use_parallel <- FALSE  # Set to TRUE for actual parallel processing
+# if (use_parallel) {
+#   doParallel::registerDoParallel(ncores)
+# }
 # # Final cv_varsel() run:
 # cvvs <- cv_varsel(
 #   refm_obj,
@@ -116,14 +120,16 @@ knitr::opts_chunk$set(
 #   nclusters_pred = 20,
 #   ###
 #   nterms_max = 9,
-#   parallel = TRUE,
+#   parallel = use_parallel,
 #   ### In interactive use, we recommend not to deactivate the verbose mode:
 #   verbose = 0
 #   ###
 # )
 # # Tear down the CV parallelization setup:
-# doParallel::stopImplicitCluster()
-# foreach::registerDoSEQ()
+# if (use_parallel) {
+#   doParallel::stopImplicitCluster()
+#   foreach::registerDoSEQ()
+# }
 
 ## ----plot_vsel----------------------------------------------------------------
 # options(projpred.plot_vsel_show_cv_proportions = TRUE)

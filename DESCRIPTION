@@ -1,8 +1,8 @@
 Package: projpred
 Encoding: UTF-8
 Title: Projection Predictive Feature Selection
-Version: 2.9.1
-Date: 2025-10-28
+Version: 2.10.0
+Date: 2025-12-05
 Authors@R: c(person("Juho", "Piironen", role = c("aut"),
                     email = "juho.t.piironen@gmail.com"),
              person("Markus", "Paasiniemi", role = "aut"),
@@ -40,19 +40,19 @@ BugReports: https://github.com/stan-dev/projpred/issues/
 Depends: R (>= 3.6.0)
 Imports: methods, utils, Rcpp, gtools, ggplot2, scales, rstantools (>=
         2.0.0), loo (>= 2.0.0), lme4 (>= 1.1-28), mvtnorm, mgcv, gamm4,
-        abind, MASS, ordinal, nnet, mclogit
-Suggests: ggrepel, rstanarm, brms, nlme, optimx, ucminf, parallel,
-        foreach, iterators, doRNG, unix, testthat, vdiffr, knitr,
-        rmarkdown, glmnet, cmdstanr, rlang, bayesplot (>= 1.5.0),
-        posterior, doParallel, future, future.callr, doFuture,
+        abind, MASS, ordinal, nnet, mclogit, reformulas,
+Suggests: ggrepel, ggfortify, rstanarm, brms, nlme, optimx, ucminf,
+        parallel, foreach, iterators, doRNG, unix, testthat, vdiffr,
+        knitr, rmarkdown, glmnet, cmdstanr, rlang, bayesplot (>=
+        1.5.0), posterior, doParallel, future, future.callr, doFuture,
         progressr
 LinkingTo: Rcpp, RcppArmadillo
 Additional_repositories: https://stan-dev.r-universe.dev/
 LazyData: TRUE
-RoxygenNote: 7.3.2
+RoxygenNote: 7.3.3
 VignetteBuilder: knitr, rmarkdown
 NeedsCompilation: yes
-Packaged: 2025-10-28 14:45:25 UTC; osvaldo
+Packaged: 2025-12-05 16:04:36 UTC; osvaldo
 Author: Juho Piironen [aut],
   Markus Paasiniemi [aut],
   Alejandro Catalina [aut],
@@ -70,4 +70,4 @@ Author: Juho Piironen [aut],
   Juho Timonen [ctb]
 Maintainer: Osvaldo Martin <aloctavodia@gmail.com>
 Repository: CRAN
-Date/Publication: 2025-10-28 15:10:02 UTC
+Date/Publication: 2025-12-06 13:30:02 UTC

@@ -352,8 +352,9 @@ proj_linpred_aux <- function(proj, newdata, offsetnew, weightsnew,
       ynew <- eval_lhs(formula = proj$refmodel$formula, data = newdata)
     }
   }
-  lpd_out <- compute_lpd(ynew = ynew, pred_sub = pred_sub, proj = proj,
-                         weights = weights, transformed = transform)
+  lpd_out <- compute_lpd(ynew = ynew, newdata = newdata, pred_sub = pred_sub,
+                         proj = proj, weights = weights,
+                         transformed = transform)
   if (integrated) {
     if (proj$refmodel$family$for_latent && transform &&
         length(dim(pred_sub)) == 3) {
@@ -409,7 +410,7 @@ proj_linpred_aux <- function(proj, newdata, offsetnew, weightsnew,
   return(nlist(pred = pred_sub, lpd = lpd_out))
 }
 
-compute_lpd <- function(ynew, pred_sub, proj, weights, transformed) {
+compute_lpd <- function(ynew, newdata, pred_sub, proj, weights, transformed) {
   if (!is.null(ynew)) {
     ## compute also the log-density
     target <- get_standard_y(ynew, weights, proj$refmodel$family)
@@ -446,6 +447,9 @@ compute_lpd <- function(ynew, pred_sub, proj, weights, transformed) {
     if (proj$refmodel$family$for_latent && transformed) {
       ll_oscale_out <- proj$refmodel$family$latent_ll_oscale(
         pred_sub, dis = proj$dis, y_oscale = ynew, wobs = weights,
+        cens = eval_el2_not_null(attr(proj$refmodel$family$latent_ll_oscale,
+                                      "cens_var"),
+                                 newdata %||% proj$refmodel$fetch_data()),
         cl_ref = proj$cl_ref, wdraws_ref = proj$wdraws_ref
       )
       if (!is.matrix(ll_oscale_out)) {
@@ -1816,16 +1820,13 @@ suggest_size.vsel <- function(
 
   if (nrow(res) == 0) {
     ## no submodel satisfying the criterion found
-    if (object$nterms_max == object$nterms_all) {
-      suggested_size <- object$nterms_max
-    } else {
-      suggested_size <- NA
-      if (warnings) {
-        warning("Could not suggest submodel size. Investigate plot.vsel() to ",
-                "identify if the search was terminated too early. If this is ",
-                "the case, run variable selection with larger value for ",
-                "`nterms_max`.")
-      }
+    suggested_size <- object$nterms_max
+    if (object$nterms_max != object$nterms_all && warnings) {
+      warning("Could not suggest submodel size within the searched range. ",
+              "Investigate plot.vsel() to identify if the search was ",
+              "terminated too early or the criterion is too strict.",
+              "If this is the case, run variable selection with ",
+              "larger value for `nterms_max` or use less strict criterion.")
     }
   } else {
     suggested_size <- min(res)

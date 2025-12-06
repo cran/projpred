@@ -196,7 +196,8 @@ knitr::opts_chunk$set(
 # latent_ll_oscale_nebin <- function(ilpreds,
 #                                    dis = rep(NA, nrow(ilpreds)),
 #                                    y_oscale,
-#                                    wobs = rep(1, length(y_oscale)),
+#                                    wobs = rep(1, ncol(ilpreds)),
+#                                    cens,
 #                                    cl_ref,
 #                                    wdraws_ref = rep(1, length(cl_ref))) {
 #   y_oscale_mat <- matrix(y_oscale, nrow = nrow(ilpreds), ncol = ncol(ilpreds),
@@ -209,7 +210,7 @@ knitr::opts_chunk$set(
 # }
 # latent_ppd_oscale_nebin <- function(ilpreds_resamp,
 #                                     dis_resamp = rep(NA, nrow(ilpreds_resamp)),
-#                                     wobs,
+#                                     wobs = rep(1, ncol(ilpreds_resamp)),
 #                                     cl_ref,
 #                                     wdraws_ref = rep(1, length(cl_ref)),
 #                                     idxs_prjdraws) {
@@ -249,4 +250,267 @@ knitr::opts_chunk$set(
 # rk_nebin <- ranking(vs_nebin)
 # ( predictors_final_nebin <- head(rk_nebin[["fulldata"]],
 #                                  size_decided_nebin) )
+
+## ----data_surv----------------------------------------------------------------
+# N_surv <- 500
+# n_pred <- 50
+# n_pred_truth <- 10
+# n_pred_noise <- n_pred - n_pred_truth
+# dat_sim_surv <- matrix(rnorm(N_surv * n_pred), ncol = n_pred)
+# colnames(dat_sim_surv) <- paste0("x", c(paste0(".", seq_len(n_pred_truth)),
+#                                         paste0("n.", seq_len(n_pred_noise))))
+# linpreds_surv <- -0.1 +
+#     dat_sim_surv[, seq_len(n_pred_truth), drop = FALSE] %*%
+#     rep_len(c(0.3, -0.2), length.out = n_pred_truth)
+# epreds_surv <- exp(linpreds_surv)
+# dat_sim_surv <- as.data.frame(dat_sim_surv)
+# cens_surv <- runif(N_surv,
+#                    min = quantile(epreds_surv, probs = 0.4),
+#                    max = quantile(epreds_surv, probs = 0.9))
+
+## ----weibull_data-------------------------------------------------------------
+# shape_weib <- 1.2
+# scales_weib <- epreds_surv / (gamma(1 + (1 / shape_weib)))
+# y_weib <- rweibull(N_surv, shape = shape_weib, scale = scales_weib)
+# is_event_weib <- y_weib < cens_surv
+# yobs_weib <- y_weib
+# yobs_weib[!is_event_weib] <- cens_surv[!is_event_weib]
+# dat_sim_weib <- data.frame(yobs = yobs_weib,
+#                            is_censored = 1 - is_event_weib,
+#                            dat_sim_surv)
+
+## ----weibull_fit--------------------------------------------------------------
+# refm_fit_weib <- brms::brm(
+#   formula = yobs | cens(is_censored) ~ .,
+#   family = brms::weibull(),
+#   data = dat_sim_weib,
+#   prior = brms::prior(R2D2(mean_R2 = 0.4, prec_R2 = 2.5, cons_D2 = 1)),
+#   ### Only for the sake of speed (not recommended in general):
+#   chains = 2,
+#   ###
+#   silent = 2,
+#   refresh = 0
+# )
+
+## ----weibull_prep_projpred----------------------------------------------------
+# refm_shape <- as.matrix(refm_fit_weib)[, "shape", drop = FALSE]
+# 
+# latent_ll_oscale_weib <- structure(function(
+#     ilpreds,
+#     dis = rep(NA, nrow(ilpreds)),
+#     y_oscale,
+#     wobs = rep(1, ncol(ilpreds)),
+#     cens,
+#     cl_ref,
+#     wdraws_ref = rep(1, length(cl_ref))
+# ) {
+#   idxs_cens <- which(cens == 1)
+#   idxs_event <- setdiff(seq_along(cens), idxs_cens)
+#   wobs_mat <- matrix(wobs, nrow = nrow(ilpreds), ncol = ncol(ilpreds),
+#                      byrow = TRUE)
+#   refm_shape_agg <- cl_agg(refm_shape, cl = cl_ref, wdraws = wdraws_ref)
+#   ll_unw <- matrix(nrow = nrow(ilpreds), ncol = ncol(ilpreds))
+#   for (idx_cens in idxs_cens) {
+#     ll_unw[, idx_cens] <- pweibull(
+#       y_oscale[idx_cens],
+#       shape = refm_shape_agg,
+#       scale = ilpreds[, idx_cens] / gamma(1 + 1 / as.vector(refm_shape_agg)),
+#       lower.tail = FALSE,
+#       log.p = TRUE
+#     )
+#   }
+#   for (idx_event in idxs_event) {
+#     ll_unw[, idx_event] <- dweibull(
+#       y_oscale[idx_event],
+#       shape = refm_shape_agg,
+#       scale = ilpreds[, idx_event] / gamma(1 + 1 / as.vector(refm_shape_agg)),
+#       log = TRUE
+#     )
+#   }
+#   return(wobs_mat * ll_unw)
+# }, cens_var = ~ is_censored)
+# 
+# latent_ppd_oscale_weib <- function(
+#     ilpreds_resamp,
+#     dis_resamp = rep(NA, nrow(ilpreds_resamp)),
+#     wobs = rep(1, ncol(ilpreds_resamp)),
+#     cl_ref,
+#     wdraws_ref = rep(1, length(cl_ref)),
+#     idxs_prjdraws
+# ) {
+#   warning("The draws from this `latent_ppd_oscale` function are uncensored.")
+#   refm_shape_agg <- cl_agg(refm_shape, cl = cl_ref, wdraws = wdraws_ref)
+#   refm_shape_agg_resamp <- refm_shape_agg[idxs_prjdraws, , drop = FALSE]
+#   ppd <- rweibull(
+#     prod(dim(ilpreds_resamp)),
+#     shape = refm_shape_agg_resamp,
+#     scale = ilpreds_resamp / gamma(1 + 1 / as.vector(refm_shape_agg_resamp))
+#   )
+#   ppd <- matrix(ppd, nrow = nrow(ilpreds_resamp), ncol = ncol(ilpreds_resamp))
+#   return(ppd)
+# }
+# 
+# refm_weib <- get_refmodel(
+#   refm_fit_weib,
+#   latent = TRUE,
+#   latent_ll_oscale = latent_ll_oscale_weib,
+#   latent_ppd_oscale = latent_ppd_oscale_weib
+# )
+
+## ----weibull_cvvs-------------------------------------------------------------
+# # For running projpred's CV in parallel (see cv_varsel()'s argument `parallel`):
+# # Note: Parallel processing is disabled during package building to avoid issues
+# use_parallel <- FALSE  # Set to TRUE for actual parallel processing
+# if (use_parallel) {
+#   doParallel::registerDoParallel(ncores)
+# }
+# cvvs_weib <- cv_varsel(
+#   refm_weib,
+#   ### Only for the sake of speed (not recommended in general):
+#   method = "L1",
+#   nloo = min(N_surv, 10),
+#   nterms_max = 11,
+#   nclusters_pred = 20,
+#   ###
+#   parallel = use_parallel,
+#   ### In interactive use, we recommend not to deactivate the verbose mode:
+#   verbose = 0
+#   ###
+# )
+# # Tear down the CV parallelization setup:
+# if (use_parallel) {
+#   doParallel::stopImplicitCluster()
+#   foreach::registerDoSEQ()
+# }
+
+## ----weibull_plot_cvvs--------------------------------------------------------
+# plot(cvvs_weib, stats = "mlpd", deltas = TRUE)
+
+## ----weibull_pppc-------------------------------------------------------------
+# predictors_final_weib <- head(ranking(cvvs_weib)[["fulldata"]], n_pred_truth)
+# prj_weib <- project(refm_weib, predictor_terms = predictors_final_weib)
+# prj_predict_weib <- proj_predict(prj_weib)
+# bayesplot::bayesplot_theme_set(ggplot2::theme_bw())
+# bayesplot::ppc_km_overlay(y = dat_sim_weib$yobs, yrep = prj_predict_weib,
+#                           status_y = 1 - dat_sim_weib$is_censored)
+
+## ----lognormal_data-----------------------------------------------------------
+# sdlog_lnorm <- 0.3
+# y_lnorm <- rlnorm(N_surv, meanlog = linpreds_surv, sdlog = sdlog_lnorm)
+# is_event_lnorm <- y_lnorm < cens_surv
+# yobs_lnorm <- y_lnorm
+# yobs_lnorm[!is_event_lnorm] <- cens_surv[!is_event_lnorm]
+# dat_sim_lnorm <- data.frame(yobs = yobs_lnorm,
+#                             is_censored = 1 - is_event_lnorm,
+#                             dat_sim_surv)
+
+## ----lognormal_fit------------------------------------------------------------
+# refm_fit_lnorm <- brms::brm(
+#   formula = yobs | cens(is_censored) ~ .,
+#   family = brms::lognormal(),
+#   data = dat_sim_lnorm,
+#   prior = brms::prior(R2D2(mean_R2 = 0.4, prec_R2 = 2.5, cons_D2 = 1)),
+#   ### Only for the sake of speed (not recommended in general):
+#   chains = 2,
+#   ###
+#   silent = 2,
+#   refresh = 0
+# )
+
+## ----lognormal_prep_projpred--------------------------------------------------
+# latent_ll_oscale_lnorm <- structure(function(
+#     ilpreds,
+#     dis = rep(NA, nrow(ilpreds)),
+#     y_oscale,
+#     wobs = rep(1, ncol(ilpreds)),
+#     cens,
+#     cl_ref,
+#     wdraws_ref = rep(1, length(cl_ref))
+# ) {
+#   idxs_cens <- which(cens == 1)
+#   idxs_event <- setdiff(seq_along(cens), idxs_cens)
+#   wobs_mat <- matrix(wobs, nrow = nrow(ilpreds), ncol = ncol(ilpreds),
+#                      byrow = TRUE)
+#   ll_unw <- matrix(nrow = nrow(ilpreds), ncol = ncol(ilpreds))
+#   for (idx_cens in idxs_cens) {
+#     ll_unw[, idx_cens] <- plnorm(
+#       y_oscale[idx_cens],
+#       meanlog = ilpreds[, idx_cens],
+#       sdlog = dis,
+#       lower.tail = FALSE,
+#       log.p = TRUE
+#     )
+#   }
+#   for (idx_event in idxs_event) {
+#     ll_unw[, idx_event] <- dlnorm(
+#       y_oscale[idx_event],
+#       meanlog = ilpreds[, idx_event],
+#       sdlog = dis,
+#       log = TRUE
+#     )
+#   }
+#   return(wobs_mat * ll_unw)
+# }, cens_var = ~ is_censored)
+# 
+# latent_ppd_oscale_lnorm <- function(
+#     ilpreds_resamp,
+#     dis_resamp = rep(NA, nrow(ilpreds_resamp)),
+#     wobs = rep(1, ncol(ilpreds_resamp)),
+#     cl_ref,
+#     wdraws_ref = rep(1, length(cl_ref)),
+#     idxs_prjdraws
+# ) {
+#   warning("The draws from this `latent_ppd_oscale` function are uncensored.")
+#   ppd <- rlnorm(
+#     prod(dim(ilpreds_resamp)),
+#     meanlog = ilpreds_resamp,
+#     sdlog = dis_resamp
+#   )
+#   ppd <- matrix(ppd, nrow = nrow(ilpreds_resamp), ncol = ncol(ilpreds_resamp))
+#   return(ppd)
+# }
+# 
+# refm_lnorm <- get_refmodel(
+#   refm_fit_lnorm,
+#   latent = TRUE,
+#   latent_ll_oscale = latent_ll_oscale_lnorm,
+#   latent_ppd_oscale = latent_ppd_oscale_lnorm,
+#   dis = as.matrix(refm_fit_lnorm)[, "sigma", drop = FALSE]
+# )
+
+## ----lognormal_cvvs-----------------------------------------------------------
+# # For running projpred's CV in parallel (see cv_varsel()'s argument `parallel`):
+# # Note: Parallel processing is disabled during package building to avoid issues
+# use_parallel <- FALSE  # Set to TRUE for actual parallel processing
+# if (use_parallel) {
+#   doParallel::registerDoParallel(ncores)
+# }
+# cvvs_lnorm <- cv_varsel(
+#   refm_lnorm,
+#   ### Only for the sake of speed (not recommended in general):
+#   method = "L1",
+#   nloo = min(N_surv, 10),
+#   nterms_max = 11,
+#   nclusters_pred = 20,
+#   ###
+#   parallel = use_parallel,
+#   ### In interactive use, we recommend not to deactivate the verbose mode:
+#   verbose = 0
+#   ###
+# )
+# # Tear down the CV parallelization setup:
+# if (use_parallel) {
+#   doParallel::stopImplicitCluster()
+#   foreach::registerDoSEQ()
+# }
+
+## ----lognormal_plot_cvvs------------------------------------------------------
+# plot(cvvs_lnorm, stats = "mlpd", deltas = TRUE)
+
+## ----lognormal_pppc-----------------------------------------------------------
+# predictors_final_lnorm <- head(ranking(cvvs_lnorm)[["fulldata"]], n_pred_truth)
+# prj_lnorm <- project(refm_lnorm, predictor_terms = predictors_final_lnorm)
+# prj_predict_lnorm <- proj_predict(prj_lnorm)
+# bayesplot::ppc_km_overlay(y = dat_sim_lnorm$yobs, yrep = prj_predict_lnorm,
+#                           status_y = 1 - dat_sim_lnorm$is_censored)
 

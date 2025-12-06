@@ -11,7 +11,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
 
-<meta name="date" content="2025-10-28" />
+<meta name="date" content="2025-12-05" />
 
 <title>Latent projection predictive feature selection</title>
 
@@ -363,7 +363,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">Latent projection predictive feature
 selection</h1>
-<h4 class="date">2025-10-28</h4>
+<h4 class="date">2025-12-05</h4>
 
 
 <div id="TOC">
@@ -393,6 +393,14 @@ model</a></li>
 <li><a href="#variable-selection-using-the-latent-projection-1" id="toc-variable-selection-using-the-latent-projection-1">Variable
 selection using the latent projection</a></li>
 <li><a href="#conclusion-1" id="toc-conclusion-1">Conclusion</a></li>
+</ul></li>
+<li><a href="#cens" id="toc-cens">Censored observations (survival
+analysis)</a>
+<ul>
+<li><a href="#weibullcensex" id="toc-weibullcensex">Example: Weibull
+distribution with right-censored observations</a></li>
+<li><a href="#lognormalcensex" id="toc-lognormalcensex">Example:
+Log-normal distribution with right-censored observations</a></li>
 </ul></li>
 <li><a href="#references" id="toc-references">References</a></li>
 </ul>
@@ -441,7 +449,10 @@ makes things a lot easier because it allows us to make use of
 <p>As illustrated by the Poisson example below, the latent projection
 can not only be used for families not supported by
 <strong>projpred</strong>’s traditional projection, but it can also be
-beneficial for families supported by it.</p>
+beneficial for families supported by it. The remaining examples show
+that the latent projection offers support for models (and censored
+observations) that the traditional (or augmented-data) projection do not
+support.</p>
 </div>
 <div id="impl" class="section level3">
 <h3>Implementation</h3>
@@ -830,45 +841,46 @@ passed to <code>extend_family()</code><a href="#fn7" class="footnote-ref" id="fn
 <span id="cb14-2"><a href="#cb14-2" tabindex="-1"></a>latent_ll_oscale_nebin <span class="ot">&lt;-</span> <span class="cf">function</span>(ilpreds,</span>
 <span id="cb14-3"><a href="#cb14-3" tabindex="-1"></a>                                   <span class="at">dis =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds)),</span>
 <span id="cb14-4"><a href="#cb14-4" tabindex="-1"></a>                                   y_oscale,</span>
-<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>                                   <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(y_oscale)),</span>
-<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>                                   cl_ref,</span>
-<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>                                   <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref))) {</span>
-<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>  y_oscale_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(y_oscale, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds),</span>
-<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>                         <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>  wobs_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(wobs, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds),</span>
-<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>                     <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>  refm_prec_agg <span class="ot">&lt;-</span> <span class="fu">cl_agg</span>(refm_prec, <span class="at">cl =</span> cl_ref, <span class="at">wdraws =</span> wdraws_ref)</span>
-<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>  ll_unw <span class="ot">&lt;-</span> <span class="fu">dnbinom</span>(y_oscale_mat, <span class="at">size =</span> refm_prec_agg, <span class="at">mu =</span> ilpreds, <span class="at">log =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>  <span class="fu">return</span>(wobs_mat <span class="sc">*</span> ll_unw)</span>
-<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>}</span>
-<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>latent_ppd_oscale_nebin <span class="ot">&lt;-</span> <span class="cf">function</span>(ilpreds_resamp,</span>
-<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>                                    <span class="at">dis_resamp =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds_resamp)),</span>
-<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>                                    wobs,</span>
-<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a>                                    cl_ref,</span>
-<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a>                                    <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref)),</span>
-<span id="cb14-21"><a href="#cb14-21" tabindex="-1"></a>                                    idxs_prjdraws) {</span>
-<span id="cb14-22"><a href="#cb14-22" tabindex="-1"></a>  refm_prec_agg <span class="ot">&lt;-</span> <span class="fu">cl_agg</span>(refm_prec, <span class="at">cl =</span> cl_ref, <span class="at">wdraws =</span> wdraws_ref)</span>
-<span id="cb14-23"><a href="#cb14-23" tabindex="-1"></a>  refm_prec_agg_resamp <span class="ot">&lt;-</span> refm_prec_agg[idxs_prjdraws, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
-<span id="cb14-24"><a href="#cb14-24" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">rnbinom</span>(<span class="fu">prod</span>(<span class="fu">dim</span>(ilpreds_resamp)), <span class="at">size =</span> refm_prec_agg_resamp,</span>
-<span id="cb14-25"><a href="#cb14-25" tabindex="-1"></a>                 <span class="at">mu =</span> ilpreds_resamp)</span>
-<span id="cb14-26"><a href="#cb14-26" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">matrix</span>(ppd, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds_resamp), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds_resamp))</span>
-<span id="cb14-27"><a href="#cb14-27" tabindex="-1"></a>  <span class="fu">return</span>(ppd)</span>
-<span id="cb14-28"><a href="#cb14-28" tabindex="-1"></a>}</span>
-<span id="cb14-29"><a href="#cb14-29" tabindex="-1"></a>refm_nebin <span class="ot">&lt;-</span> <span class="fu">get_refmodel</span>(refm_fit_nebin, <span class="at">latent =</span> <span class="cn">TRUE</span>,</span>
-<span id="cb14-30"><a href="#cb14-30" tabindex="-1"></a>                           <span class="at">latent_ll_oscale =</span> latent_ll_oscale_nebin,</span>
-<span id="cb14-31"><a href="#cb14-31" tabindex="-1"></a>                           <span class="at">latent_ppd_oscale =</span> latent_ppd_oscale_nebin)</span>
-<span id="cb14-32"><a href="#cb14-32" tabindex="-1"></a>vs_nebin <span class="ot">&lt;-</span> <span class="fu">varsel</span>(</span>
-<span id="cb14-33"><a href="#cb14-33" tabindex="-1"></a>  refm_nebin,</span>
-<span id="cb14-34"><a href="#cb14-34" tabindex="-1"></a>  <span class="at">d_test =</span> d_test_lat_poiss,</span>
-<span id="cb14-35"><a href="#cb14-35" tabindex="-1"></a>  <span class="do">### Only for the sake of speed (not recommended in general):</span></span>
-<span id="cb14-36"><a href="#cb14-36" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;L1&quot;</span>,</span>
-<span id="cb14-37"><a href="#cb14-37" tabindex="-1"></a>  <span class="at">nclusters_pred =</span> <span class="dv">20</span>,</span>
-<span id="cb14-38"><a href="#cb14-38" tabindex="-1"></a>  <span class="do">###</span></span>
-<span id="cb14-39"><a href="#cb14-39" tabindex="-1"></a>  <span class="at">nterms_max =</span> <span class="dv">14</span>,</span>
-<span id="cb14-40"><a href="#cb14-40" tabindex="-1"></a>  <span class="do">### In interactive use, we recommend not to deactivate the verbose mode:</span></span>
-<span id="cb14-41"><a href="#cb14-41" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="dv">0</span></span>
-<span id="cb14-42"><a href="#cb14-42" tabindex="-1"></a>  <span class="do">###</span></span>
-<span id="cb14-43"><a href="#cb14-43" tabindex="-1"></a>)</span></code></pre></div>
+<span id="cb14-5"><a href="#cb14-5" tabindex="-1"></a>                                   <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">ncol</span>(ilpreds)),</span>
+<span id="cb14-6"><a href="#cb14-6" tabindex="-1"></a>                                   cens,</span>
+<span id="cb14-7"><a href="#cb14-7" tabindex="-1"></a>                                   cl_ref,</span>
+<span id="cb14-8"><a href="#cb14-8" tabindex="-1"></a>                                   <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref))) {</span>
+<span id="cb14-9"><a href="#cb14-9" tabindex="-1"></a>  y_oscale_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(y_oscale, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds),</span>
+<span id="cb14-10"><a href="#cb14-10" tabindex="-1"></a>                         <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-11"><a href="#cb14-11" tabindex="-1"></a>  wobs_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(wobs, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds),</span>
+<span id="cb14-12"><a href="#cb14-12" tabindex="-1"></a>                     <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-13"><a href="#cb14-13" tabindex="-1"></a>  refm_prec_agg <span class="ot">&lt;-</span> <span class="fu">cl_agg</span>(refm_prec, <span class="at">cl =</span> cl_ref, <span class="at">wdraws =</span> wdraws_ref)</span>
+<span id="cb14-14"><a href="#cb14-14" tabindex="-1"></a>  ll_unw <span class="ot">&lt;-</span> <span class="fu">dnbinom</span>(y_oscale_mat, <span class="at">size =</span> refm_prec_agg, <span class="at">mu =</span> ilpreds, <span class="at">log =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb14-15"><a href="#cb14-15" tabindex="-1"></a>  <span class="fu">return</span>(wobs_mat <span class="sc">*</span> ll_unw)</span>
+<span id="cb14-16"><a href="#cb14-16" tabindex="-1"></a>}</span>
+<span id="cb14-17"><a href="#cb14-17" tabindex="-1"></a>latent_ppd_oscale_nebin <span class="ot">&lt;-</span> <span class="cf">function</span>(ilpreds_resamp,</span>
+<span id="cb14-18"><a href="#cb14-18" tabindex="-1"></a>                                    <span class="at">dis_resamp =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds_resamp)),</span>
+<span id="cb14-19"><a href="#cb14-19" tabindex="-1"></a>                                    <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">ncol</span>(ilpreds_resamp)),</span>
+<span id="cb14-20"><a href="#cb14-20" tabindex="-1"></a>                                    cl_ref,</span>
+<span id="cb14-21"><a href="#cb14-21" tabindex="-1"></a>                                    <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref)),</span>
+<span id="cb14-22"><a href="#cb14-22" tabindex="-1"></a>                                    idxs_prjdraws) {</span>
+<span id="cb14-23"><a href="#cb14-23" tabindex="-1"></a>  refm_prec_agg <span class="ot">&lt;-</span> <span class="fu">cl_agg</span>(refm_prec, <span class="at">cl =</span> cl_ref, <span class="at">wdraws =</span> wdraws_ref)</span>
+<span id="cb14-24"><a href="#cb14-24" tabindex="-1"></a>  refm_prec_agg_resamp <span class="ot">&lt;-</span> refm_prec_agg[idxs_prjdraws, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb14-25"><a href="#cb14-25" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">rnbinom</span>(<span class="fu">prod</span>(<span class="fu">dim</span>(ilpreds_resamp)), <span class="at">size =</span> refm_prec_agg_resamp,</span>
+<span id="cb14-26"><a href="#cb14-26" tabindex="-1"></a>                 <span class="at">mu =</span> ilpreds_resamp)</span>
+<span id="cb14-27"><a href="#cb14-27" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">matrix</span>(ppd, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds_resamp), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds_resamp))</span>
+<span id="cb14-28"><a href="#cb14-28" tabindex="-1"></a>  <span class="fu">return</span>(ppd)</span>
+<span id="cb14-29"><a href="#cb14-29" tabindex="-1"></a>}</span>
+<span id="cb14-30"><a href="#cb14-30" tabindex="-1"></a>refm_nebin <span class="ot">&lt;-</span> <span class="fu">get_refmodel</span>(refm_fit_nebin, <span class="at">latent =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb14-31"><a href="#cb14-31" tabindex="-1"></a>                           <span class="at">latent_ll_oscale =</span> latent_ll_oscale_nebin,</span>
+<span id="cb14-32"><a href="#cb14-32" tabindex="-1"></a>                           <span class="at">latent_ppd_oscale =</span> latent_ppd_oscale_nebin)</span>
+<span id="cb14-33"><a href="#cb14-33" tabindex="-1"></a>vs_nebin <span class="ot">&lt;-</span> <span class="fu">varsel</span>(</span>
+<span id="cb14-34"><a href="#cb14-34" tabindex="-1"></a>  refm_nebin,</span>
+<span id="cb14-35"><a href="#cb14-35" tabindex="-1"></a>  <span class="at">d_test =</span> d_test_lat_poiss,</span>
+<span id="cb14-36"><a href="#cb14-36" tabindex="-1"></a>  <span class="do">### Only for the sake of speed (not recommended in general):</span></span>
+<span id="cb14-37"><a href="#cb14-37" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;L1&quot;</span>,</span>
+<span id="cb14-38"><a href="#cb14-38" tabindex="-1"></a>  <span class="at">nclusters_pred =</span> <span class="dv">20</span>,</span>
+<span id="cb14-39"><a href="#cb14-39" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb14-40"><a href="#cb14-40" tabindex="-1"></a>  <span class="at">nterms_max =</span> <span class="dv">14</span>,</span>
+<span id="cb14-41"><a href="#cb14-41" tabindex="-1"></a>  <span class="do">### In interactive use, we recommend not to deactivate the verbose mode:</span></span>
+<span id="cb14-42"><a href="#cb14-42" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="dv">0</span></span>
+<span id="cb14-43"><a href="#cb14-43" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb14-44"><a href="#cb14-44" tabindex="-1"></a>)</span></code></pre></div>
 <p>Again, the message telling that <code>&lt;refmodel&gt;$dis</code>
 consists of only <code>NA</code>s will not concern us here because we
 will only focus on response-scale post-processing. The message
@@ -904,6 +916,313 @@ those families which are neither supported by
 <strong>projpred</strong>’s traditional nor by
 <strong>projpred</strong>’s augmented-data projection, which reflects
 the flexibility of the latent approach.</p>
+</div>
+</div>
+<div id="cens" class="section level2">
+<h2>Censored observations (survival analysis)</h2>
+<p>Response-scale analyses for models with censored responses (e.g., for
+time-to-event models as occurring in survival analysis) are possible
+when using the latent projection in combination with a custom
+<code>latent_ll_oscale</code> function (see <code>?extend_family</code>)
+that has an attribute called <code>cens_var</code> and makes use of its
+argument <code>cens</code><a href="#fn8" class="footnote-ref" id="fnref8"><sup>8</sup></a>.</p>
+<p>We will illustrate this here using simulated data and right
+censoring, first with a Weibull response and then with a log-normal
+response. Both examples are adapted from a <a href="https://discourse.mc-stan.org/t/using-projpred-latent-projection-with-brms-weibull-family-models/39275">thread</a>
+on The Stan Forums. Here, we use the following common simulation
+part:</p>
+<div class="sourceCode" id="cb19"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" tabindex="-1"></a>N_surv <span class="ot">&lt;-</span> <span class="dv">500</span></span>
+<span id="cb19-2"><a href="#cb19-2" tabindex="-1"></a>n_pred <span class="ot">&lt;-</span> <span class="dv">50</span></span>
+<span id="cb19-3"><a href="#cb19-3" tabindex="-1"></a>n_pred_truth <span class="ot">&lt;-</span> <span class="dv">10</span></span>
+<span id="cb19-4"><a href="#cb19-4" tabindex="-1"></a>n_pred_noise <span class="ot">&lt;-</span> n_pred <span class="sc">-</span> n_pred_truth</span>
+<span id="cb19-5"><a href="#cb19-5" tabindex="-1"></a>dat_sim_surv <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">rnorm</span>(N_surv <span class="sc">*</span> n_pred), <span class="at">ncol =</span> n_pred)</span>
+<span id="cb19-6"><a href="#cb19-6" tabindex="-1"></a><span class="fu">colnames</span>(dat_sim_surv) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">&quot;x&quot;</span>, <span class="fu">c</span>(<span class="fu">paste0</span>(<span class="st">&quot;.&quot;</span>, <span class="fu">seq_len</span>(n_pred_truth)),</span>
+<span id="cb19-7"><a href="#cb19-7" tabindex="-1"></a>                                        <span class="fu">paste0</span>(<span class="st">&quot;n.&quot;</span>, <span class="fu">seq_len</span>(n_pred_noise))))</span>
+<span id="cb19-8"><a href="#cb19-8" tabindex="-1"></a>linpreds_surv <span class="ot">&lt;-</span> <span class="sc">-</span><span class="fl">0.1</span> <span class="sc">+</span></span>
+<span id="cb19-9"><a href="#cb19-9" tabindex="-1"></a>    dat_sim_surv[, <span class="fu">seq_len</span>(n_pred_truth), drop <span class="ot">=</span> <span class="cn">FALSE</span>] <span class="sc">%*%</span></span>
+<span id="cb19-10"><a href="#cb19-10" tabindex="-1"></a>    <span class="fu">rep_len</span>(<span class="fu">c</span>(<span class="fl">0.3</span>, <span class="sc">-</span><span class="fl">0.2</span>), <span class="at">length.out =</span> n_pred_truth)</span>
+<span id="cb19-11"><a href="#cb19-11" tabindex="-1"></a>epreds_surv <span class="ot">&lt;-</span> <span class="fu">exp</span>(linpreds_surv)</span>
+<span id="cb19-12"><a href="#cb19-12" tabindex="-1"></a>dat_sim_surv <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(dat_sim_surv)</span>
+<span id="cb19-13"><a href="#cb19-13" tabindex="-1"></a>cens_surv <span class="ot">&lt;-</span> <span class="fu">runif</span>(N_surv,</span>
+<span id="cb19-14"><a href="#cb19-14" tabindex="-1"></a>                   <span class="at">min =</span> <span class="fu">quantile</span>(epreds_surv, <span class="at">probs =</span> <span class="fl">0.4</span>),</span>
+<span id="cb19-15"><a href="#cb19-15" tabindex="-1"></a>                   <span class="at">max =</span> <span class="fu">quantile</span>(epreds_surv, <span class="at">probs =</span> <span class="fl">0.9</span>))</span></code></pre></div>
+<div id="weibullcensex" class="section level3">
+<h3>Example: Weibull distribution with right-censored observations</h3>
+<p>For the Weibull model, we complete our data generation as
+follows:</p>
+<div class="sourceCode" id="cb20"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" tabindex="-1"></a>shape_weib <span class="ot">&lt;-</span> <span class="fl">1.2</span></span>
+<span id="cb20-2"><a href="#cb20-2" tabindex="-1"></a>scales_weib <span class="ot">&lt;-</span> epreds_surv <span class="sc">/</span> (<span class="fu">gamma</span>(<span class="dv">1</span> <span class="sc">+</span> (<span class="dv">1</span> <span class="sc">/</span> shape_weib)))</span>
+<span id="cb20-3"><a href="#cb20-3" tabindex="-1"></a>y_weib <span class="ot">&lt;-</span> <span class="fu">rweibull</span>(N_surv, <span class="at">shape =</span> shape_weib, <span class="at">scale =</span> scales_weib)</span>
+<span id="cb20-4"><a href="#cb20-4" tabindex="-1"></a>is_event_weib <span class="ot">&lt;-</span> y_weib <span class="sc">&lt;</span> cens_surv</span>
+<span id="cb20-5"><a href="#cb20-5" tabindex="-1"></a>yobs_weib <span class="ot">&lt;-</span> y_weib</span>
+<span id="cb20-6"><a href="#cb20-6" tabindex="-1"></a>yobs_weib[<span class="sc">!</span>is_event_weib] <span class="ot">&lt;-</span> cens_surv[<span class="sc">!</span>is_event_weib]</span>
+<span id="cb20-7"><a href="#cb20-7" tabindex="-1"></a>dat_sim_weib <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">yobs =</span> yobs_weib,</span>
+<span id="cb20-8"><a href="#cb20-8" tabindex="-1"></a>                           <span class="at">is_censored =</span> <span class="dv">1</span> <span class="sc">-</span> is_event_weib,</span>
+<span id="cb20-9"><a href="#cb20-9" tabindex="-1"></a>                           dat_sim_surv)</span></code></pre></div>
+<p>We now fit a reference model in <a href="https://paulbuerkner.com/brms/"><strong>brms</strong></a>:</p>
+<div class="sourceCode" id="cb21"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" tabindex="-1"></a>refm_fit_weib <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">brm</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" tabindex="-1"></a>  <span class="at">formula =</span> yobs <span class="sc">|</span> <span class="fu">cens</span>(is_censored) <span class="sc">~</span> .,</span>
+<span id="cb21-3"><a href="#cb21-3" tabindex="-1"></a>  <span class="at">family =</span> brms<span class="sc">::</span><span class="fu">weibull</span>(),</span>
+<span id="cb21-4"><a href="#cb21-4" tabindex="-1"></a>  <span class="at">data =</span> dat_sim_weib,</span>
+<span id="cb21-5"><a href="#cb21-5" tabindex="-1"></a>  <span class="at">prior =</span> brms<span class="sc">::</span><span class="fu">prior</span>(<span class="fu">R2D2</span>(<span class="at">mean_R2 =</span> <span class="fl">0.4</span>, <span class="at">prec_R2 =</span> <span class="fl">2.5</span>, <span class="at">cons_D2 =</span> <span class="dv">1</span>)),</span>
+<span id="cb21-6"><a href="#cb21-6" tabindex="-1"></a>  <span class="do">### Only for the sake of speed (not recommended in general):</span></span>
+<span id="cb21-7"><a href="#cb21-7" tabindex="-1"></a>  <span class="at">chains =</span> <span class="dv">2</span>,</span>
+<span id="cb21-8"><a href="#cb21-8" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb21-9"><a href="#cb21-9" tabindex="-1"></a>  <span class="at">silent =</span> <span class="dv">2</span>,</span>
+<span id="cb21-10"><a href="#cb21-10" tabindex="-1"></a>  <span class="at">refresh =</span> <span class="dv">0</span></span>
+<span id="cb21-11"><a href="#cb21-11" tabindex="-1"></a>)</span></code></pre></div>
+<p>The following code prepares the <code>cv_varsel()</code> run and the
+downstream <strong>projpred</strong> steps:</p>
+<div class="sourceCode" id="cb22"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" tabindex="-1"></a>refm_shape <span class="ot">&lt;-</span> <span class="fu">as.matrix</span>(refm_fit_weib)[, <span class="st">&quot;shape&quot;</span>, drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb22-2"><a href="#cb22-2" tabindex="-1"></a></span>
+<span id="cb22-3"><a href="#cb22-3" tabindex="-1"></a>latent_ll_oscale_weib <span class="ot">&lt;-</span> <span class="fu">structure</span>(<span class="cf">function</span>(</span>
+<span id="cb22-4"><a href="#cb22-4" tabindex="-1"></a>    ilpreds,</span>
+<span id="cb22-5"><a href="#cb22-5" tabindex="-1"></a>    <span class="at">dis =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds)),</span>
+<span id="cb22-6"><a href="#cb22-6" tabindex="-1"></a>    y_oscale,</span>
+<span id="cb22-7"><a href="#cb22-7" tabindex="-1"></a>    <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">ncol</span>(ilpreds)),</span>
+<span id="cb22-8"><a href="#cb22-8" tabindex="-1"></a>    cens,</span>
+<span id="cb22-9"><a href="#cb22-9" tabindex="-1"></a>    cl_ref,</span>
+<span id="cb22-10"><a href="#cb22-10" tabindex="-1"></a>    <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref))</span>
+<span id="cb22-11"><a href="#cb22-11" tabindex="-1"></a>) {</span>
+<span id="cb22-12"><a href="#cb22-12" tabindex="-1"></a>  idxs_cens <span class="ot">&lt;-</span> <span class="fu">which</span>(cens <span class="sc">==</span> <span class="dv">1</span>)</span>
+<span id="cb22-13"><a href="#cb22-13" tabindex="-1"></a>  idxs_event <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">seq_along</span>(cens), idxs_cens)</span>
+<span id="cb22-14"><a href="#cb22-14" tabindex="-1"></a>  wobs_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(wobs, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds),</span>
+<span id="cb22-15"><a href="#cb22-15" tabindex="-1"></a>                     <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb22-16"><a href="#cb22-16" tabindex="-1"></a>  refm_shape_agg <span class="ot">&lt;-</span> <span class="fu">cl_agg</span>(refm_shape, <span class="at">cl =</span> cl_ref, <span class="at">wdraws =</span> wdraws_ref)</span>
+<span id="cb22-17"><a href="#cb22-17" tabindex="-1"></a>  ll_unw <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds))</span>
+<span id="cb22-18"><a href="#cb22-18" tabindex="-1"></a>  <span class="cf">for</span> (idx_cens <span class="cf">in</span> idxs_cens) {</span>
+<span id="cb22-19"><a href="#cb22-19" tabindex="-1"></a>    ll_unw[, idx_cens] <span class="ot">&lt;-</span> <span class="fu">pweibull</span>(</span>
+<span id="cb22-20"><a href="#cb22-20" tabindex="-1"></a>      y_oscale[idx_cens],</span>
+<span id="cb22-21"><a href="#cb22-21" tabindex="-1"></a>      <span class="at">shape =</span> refm_shape_agg,</span>
+<span id="cb22-22"><a href="#cb22-22" tabindex="-1"></a>      <span class="at">scale =</span> ilpreds[, idx_cens] <span class="sc">/</span> <span class="fu">gamma</span>(<span class="dv">1</span> <span class="sc">+</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">as.vector</span>(refm_shape_agg)),</span>
+<span id="cb22-23"><a href="#cb22-23" tabindex="-1"></a>      <span class="at">lower.tail =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb22-24"><a href="#cb22-24" tabindex="-1"></a>      <span class="at">log.p =</span> <span class="cn">TRUE</span></span>
+<span id="cb22-25"><a href="#cb22-25" tabindex="-1"></a>    )</span>
+<span id="cb22-26"><a href="#cb22-26" tabindex="-1"></a>  }</span>
+<span id="cb22-27"><a href="#cb22-27" tabindex="-1"></a>  <span class="cf">for</span> (idx_event <span class="cf">in</span> idxs_event) {</span>
+<span id="cb22-28"><a href="#cb22-28" tabindex="-1"></a>    ll_unw[, idx_event] <span class="ot">&lt;-</span> <span class="fu">dweibull</span>(</span>
+<span id="cb22-29"><a href="#cb22-29" tabindex="-1"></a>      y_oscale[idx_event],</span>
+<span id="cb22-30"><a href="#cb22-30" tabindex="-1"></a>      <span class="at">shape =</span> refm_shape_agg,</span>
+<span id="cb22-31"><a href="#cb22-31" tabindex="-1"></a>      <span class="at">scale =</span> ilpreds[, idx_event] <span class="sc">/</span> <span class="fu">gamma</span>(<span class="dv">1</span> <span class="sc">+</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">as.vector</span>(refm_shape_agg)),</span>
+<span id="cb22-32"><a href="#cb22-32" tabindex="-1"></a>      <span class="at">log =</span> <span class="cn">TRUE</span></span>
+<span id="cb22-33"><a href="#cb22-33" tabindex="-1"></a>    )</span>
+<span id="cb22-34"><a href="#cb22-34" tabindex="-1"></a>  }</span>
+<span id="cb22-35"><a href="#cb22-35" tabindex="-1"></a>  <span class="fu">return</span>(wobs_mat <span class="sc">*</span> ll_unw)</span>
+<span id="cb22-36"><a href="#cb22-36" tabindex="-1"></a>}, <span class="at">cens_var =</span> <span class="sc">~</span> is_censored)</span>
+<span id="cb22-37"><a href="#cb22-37" tabindex="-1"></a></span>
+<span id="cb22-38"><a href="#cb22-38" tabindex="-1"></a>latent_ppd_oscale_weib <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb22-39"><a href="#cb22-39" tabindex="-1"></a>    ilpreds_resamp,</span>
+<span id="cb22-40"><a href="#cb22-40" tabindex="-1"></a>    <span class="at">dis_resamp =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds_resamp)),</span>
+<span id="cb22-41"><a href="#cb22-41" tabindex="-1"></a>    <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">ncol</span>(ilpreds_resamp)),</span>
+<span id="cb22-42"><a href="#cb22-42" tabindex="-1"></a>    cl_ref,</span>
+<span id="cb22-43"><a href="#cb22-43" tabindex="-1"></a>    <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref)),</span>
+<span id="cb22-44"><a href="#cb22-44" tabindex="-1"></a>    idxs_prjdraws</span>
+<span id="cb22-45"><a href="#cb22-45" tabindex="-1"></a>) {</span>
+<span id="cb22-46"><a href="#cb22-46" tabindex="-1"></a>  <span class="fu">warning</span>(<span class="st">&quot;The draws from this `latent_ppd_oscale` function are uncensored.&quot;</span>)</span>
+<span id="cb22-47"><a href="#cb22-47" tabindex="-1"></a>  refm_shape_agg <span class="ot">&lt;-</span> <span class="fu">cl_agg</span>(refm_shape, <span class="at">cl =</span> cl_ref, <span class="at">wdraws =</span> wdraws_ref)</span>
+<span id="cb22-48"><a href="#cb22-48" tabindex="-1"></a>  refm_shape_agg_resamp <span class="ot">&lt;-</span> refm_shape_agg[idxs_prjdraws, , drop <span class="ot">=</span> <span class="cn">FALSE</span>]</span>
+<span id="cb22-49"><a href="#cb22-49" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">rweibull</span>(</span>
+<span id="cb22-50"><a href="#cb22-50" tabindex="-1"></a>    <span class="fu">prod</span>(<span class="fu">dim</span>(ilpreds_resamp)),</span>
+<span id="cb22-51"><a href="#cb22-51" tabindex="-1"></a>    <span class="at">shape =</span> refm_shape_agg_resamp,</span>
+<span id="cb22-52"><a href="#cb22-52" tabindex="-1"></a>    <span class="at">scale =</span> ilpreds_resamp <span class="sc">/</span> <span class="fu">gamma</span>(<span class="dv">1</span> <span class="sc">+</span> <span class="dv">1</span> <span class="sc">/</span> <span class="fu">as.vector</span>(refm_shape_agg_resamp))</span>
+<span id="cb22-53"><a href="#cb22-53" tabindex="-1"></a>  )</span>
+<span id="cb22-54"><a href="#cb22-54" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">matrix</span>(ppd, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds_resamp), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds_resamp))</span>
+<span id="cb22-55"><a href="#cb22-55" tabindex="-1"></a>  <span class="fu">return</span>(ppd)</span>
+<span id="cb22-56"><a href="#cb22-56" tabindex="-1"></a>}</span>
+<span id="cb22-57"><a href="#cb22-57" tabindex="-1"></a></span>
+<span id="cb22-58"><a href="#cb22-58" tabindex="-1"></a>refm_weib <span class="ot">&lt;-</span> <span class="fu">get_refmodel</span>(</span>
+<span id="cb22-59"><a href="#cb22-59" tabindex="-1"></a>  refm_fit_weib,</span>
+<span id="cb22-60"><a href="#cb22-60" tabindex="-1"></a>  <span class="at">latent =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb22-61"><a href="#cb22-61" tabindex="-1"></a>  <span class="at">latent_ll_oscale =</span> latent_ll_oscale_weib,</span>
+<span id="cb22-62"><a href="#cb22-62" tabindex="-1"></a>  <span class="at">latent_ppd_oscale =</span> latent_ppd_oscale_weib</span>
+<span id="cb22-63"><a href="#cb22-63" tabindex="-1"></a>)</span></code></pre></div>
+<p>Again, the message telling that <code>&lt;refmodel&gt;$dis</code>
+consists of only <code>NA</code>s will not concern us here because we
+will only focus on response-scale post-processing. The message
+concerning <code>latent_ilink</code> can be safely ignored here (the
+internal default based on <code>family$linkinv</code> works correctly in
+this case).</p>
+<p>Run <code>cv_varsel()</code>:</p>
+<div class="sourceCode" id="cb23"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" tabindex="-1"></a><span class="co"># For running projpred&#39;s CV in parallel (see cv_varsel()&#39;s argument `parallel`):</span></span>
+<span id="cb23-2"><a href="#cb23-2" tabindex="-1"></a><span class="co"># Note: Parallel processing is disabled during package building to avoid issues</span></span>
+<span id="cb23-3"><a href="#cb23-3" tabindex="-1"></a>use_parallel <span class="ot">&lt;-</span> <span class="cn">FALSE</span>  <span class="co"># Set to TRUE for actual parallel processing</span></span>
+<span id="cb23-4"><a href="#cb23-4" tabindex="-1"></a><span class="cf">if</span> (use_parallel) {</span>
+<span id="cb23-5"><a href="#cb23-5" tabindex="-1"></a>  doParallel<span class="sc">::</span><span class="fu">registerDoParallel</span>(ncores)</span>
+<span id="cb23-6"><a href="#cb23-6" tabindex="-1"></a>}</span>
+<span id="cb23-7"><a href="#cb23-7" tabindex="-1"></a>cvvs_weib <span class="ot">&lt;-</span> <span class="fu">cv_varsel</span>(</span>
+<span id="cb23-8"><a href="#cb23-8" tabindex="-1"></a>  refm_weib,</span>
+<span id="cb23-9"><a href="#cb23-9" tabindex="-1"></a>  <span class="do">### Only for the sake of speed (not recommended in general):</span></span>
+<span id="cb23-10"><a href="#cb23-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;L1&quot;</span>,</span>
+<span id="cb23-11"><a href="#cb23-11" tabindex="-1"></a>  <span class="at">nloo =</span> <span class="fu">min</span>(N_surv, <span class="dv">10</span>),</span>
+<span id="cb23-12"><a href="#cb23-12" tabindex="-1"></a>  <span class="at">nterms_max =</span> <span class="dv">11</span>,</span>
+<span id="cb23-13"><a href="#cb23-13" tabindex="-1"></a>  <span class="at">nclusters_pred =</span> <span class="dv">20</span>,</span>
+<span id="cb23-14"><a href="#cb23-14" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb23-15"><a href="#cb23-15" tabindex="-1"></a>  <span class="at">parallel =</span> use_parallel,</span>
+<span id="cb23-16"><a href="#cb23-16" tabindex="-1"></a>  <span class="do">### In interactive use, we recommend not to deactivate the verbose mode:</span></span>
+<span id="cb23-17"><a href="#cb23-17" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="dv">0</span></span>
+<span id="cb23-18"><a href="#cb23-18" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb23-19"><a href="#cb23-19" tabindex="-1"></a>)</span>
+<span id="cb23-20"><a href="#cb23-20" tabindex="-1"></a><span class="co"># Tear down the CV parallelization setup:</span></span>
+<span id="cb23-21"><a href="#cb23-21" tabindex="-1"></a><span class="cf">if</span> (use_parallel) {</span>
+<span id="cb23-22"><a href="#cb23-22" tabindex="-1"></a>  doParallel<span class="sc">::</span><span class="fu">stopImplicitCluster</span>()</span>
+<span id="cb23-23"><a href="#cb23-23" tabindex="-1"></a>  foreach<span class="sc">::</span><span class="fu">registerDoSEQ</span>()</span>
+<span id="cb23-24"><a href="#cb23-24" tabindex="-1"></a>}</span></code></pre></div>
+<p>In this case, we will ignore the warnings about high Pareto-<span class="math inline">\(\hat{k}\)</span> values because we chose quite
+rough settings (e.g., only 2 MCMC chains) in this vignette (for
+technical reasons). We will also ignore the warning that SIS is used
+(instead of PSIS) because this is due to
+<code>nclusters_pred = 20</code> which we used only to speed up the
+building of the vignette.</p>
+<p>Plot the results:</p>
+<div class="sourceCode" id="cb24"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" tabindex="-1"></a><span class="fu">plot</span>(cvvs_weib, <span class="at">stats =</span> <span class="st">&quot;mlpd&quot;</span>, <span class="at">deltas =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>Hence, the truly relevant predictors are identified correctly.</p>
+<p>Project onto the submodel consisting of the first
+<code>n_pred_truth</code> predictors and perform a “posterior-projection
+predictive check” (PPPC):</p>
+<div class="sourceCode" id="cb25"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" tabindex="-1"></a>predictors_final_weib <span class="ot">&lt;-</span> <span class="fu">head</span>(<span class="fu">ranking</span>(cvvs_weib)[[<span class="st">&quot;fulldata&quot;</span>]], n_pred_truth)</span>
+<span id="cb25-2"><a href="#cb25-2" tabindex="-1"></a>prj_weib <span class="ot">&lt;-</span> <span class="fu">project</span>(refm_weib, <span class="at">predictor_terms =</span> predictors_final_weib)</span>
+<span id="cb25-3"><a href="#cb25-3" tabindex="-1"></a>prj_predict_weib <span class="ot">&lt;-</span> <span class="fu">proj_predict</span>(prj_weib)</span>
+<span id="cb25-4"><a href="#cb25-4" tabindex="-1"></a>bayesplot<span class="sc">::</span><span class="fu">bayesplot_theme_set</span>(ggplot2<span class="sc">::</span><span class="fu">theme_bw</span>())</span>
+<span id="cb25-5"><a href="#cb25-5" tabindex="-1"></a>bayesplot<span class="sc">::</span><span class="fu">ppc_km_overlay</span>(<span class="at">y =</span> dat_sim_weib<span class="sc">$</span>yobs, <span class="at">yrep =</span> prj_predict_weib,</span>
+<span id="cb25-6"><a href="#cb25-6" tabindex="-1"></a>                          <span class="at">status_y =</span> <span class="dv">1</span> <span class="sc">-</span> dat_sim_weib<span class="sc">$</span>is_censored)</span></code></pre></div>
+<p>As expected, this PPPC indicates that this submodel is a reasonable
+one (keeping in mind that such a PPPC is just a single model-diagnostic
+tool).</p>
+</div>
+<div id="lognormalcensex" class="section level3">
+<h3>Example: Log-normal distribution with right-censored
+observations</h3>
+<p>For the log-normal model, we complete our data generation as
+follows:</p>
+<div class="sourceCode" id="cb26"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" tabindex="-1"></a>sdlog_lnorm <span class="ot">&lt;-</span> <span class="fl">0.3</span></span>
+<span id="cb26-2"><a href="#cb26-2" tabindex="-1"></a>y_lnorm <span class="ot">&lt;-</span> <span class="fu">rlnorm</span>(N_surv, <span class="at">meanlog =</span> linpreds_surv, <span class="at">sdlog =</span> sdlog_lnorm)</span>
+<span id="cb26-3"><a href="#cb26-3" tabindex="-1"></a>is_event_lnorm <span class="ot">&lt;-</span> y_lnorm <span class="sc">&lt;</span> cens_surv</span>
+<span id="cb26-4"><a href="#cb26-4" tabindex="-1"></a>yobs_lnorm <span class="ot">&lt;-</span> y_lnorm</span>
+<span id="cb26-5"><a href="#cb26-5" tabindex="-1"></a>yobs_lnorm[<span class="sc">!</span>is_event_lnorm] <span class="ot">&lt;-</span> cens_surv[<span class="sc">!</span>is_event_lnorm]</span>
+<span id="cb26-6"><a href="#cb26-6" tabindex="-1"></a>dat_sim_lnorm <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">yobs =</span> yobs_lnorm,</span>
+<span id="cb26-7"><a href="#cb26-7" tabindex="-1"></a>                            <span class="at">is_censored =</span> <span class="dv">1</span> <span class="sc">-</span> is_event_lnorm,</span>
+<span id="cb26-8"><a href="#cb26-8" tabindex="-1"></a>                            dat_sim_surv)</span></code></pre></div>
+<p>Again, we fit a reference model in <strong>brms</strong>:</p>
+<div class="sourceCode" id="cb27"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" tabindex="-1"></a>refm_fit_lnorm <span class="ot">&lt;-</span> brms<span class="sc">::</span><span class="fu">brm</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" tabindex="-1"></a>  <span class="at">formula =</span> yobs <span class="sc">|</span> <span class="fu">cens</span>(is_censored) <span class="sc">~</span> .,</span>
+<span id="cb27-3"><a href="#cb27-3" tabindex="-1"></a>  <span class="at">family =</span> brms<span class="sc">::</span><span class="fu">lognormal</span>(),</span>
+<span id="cb27-4"><a href="#cb27-4" tabindex="-1"></a>  <span class="at">data =</span> dat_sim_lnorm,</span>
+<span id="cb27-5"><a href="#cb27-5" tabindex="-1"></a>  <span class="at">prior =</span> brms<span class="sc">::</span><span class="fu">prior</span>(<span class="fu">R2D2</span>(<span class="at">mean_R2 =</span> <span class="fl">0.4</span>, <span class="at">prec_R2 =</span> <span class="fl">2.5</span>, <span class="at">cons_D2 =</span> <span class="dv">1</span>)),</span>
+<span id="cb27-6"><a href="#cb27-6" tabindex="-1"></a>  <span class="do">### Only for the sake of speed (not recommended in general):</span></span>
+<span id="cb27-7"><a href="#cb27-7" tabindex="-1"></a>  <span class="at">chains =</span> <span class="dv">2</span>,</span>
+<span id="cb27-8"><a href="#cb27-8" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb27-9"><a href="#cb27-9" tabindex="-1"></a>  <span class="at">silent =</span> <span class="dv">2</span>,</span>
+<span id="cb27-10"><a href="#cb27-10" tabindex="-1"></a>  <span class="at">refresh =</span> <span class="dv">0</span></span>
+<span id="cb27-11"><a href="#cb27-11" tabindex="-1"></a>)</span></code></pre></div>
+<p>The following code prepares the <code>cv_varsel()</code> run and the
+downstream <strong>projpred</strong> steps:</p>
+<div class="sourceCode" id="cb28"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" tabindex="-1"></a>latent_ll_oscale_lnorm <span class="ot">&lt;-</span> <span class="fu">structure</span>(<span class="cf">function</span>(</span>
+<span id="cb28-2"><a href="#cb28-2" tabindex="-1"></a>    ilpreds,</span>
+<span id="cb28-3"><a href="#cb28-3" tabindex="-1"></a>    <span class="at">dis =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds)),</span>
+<span id="cb28-4"><a href="#cb28-4" tabindex="-1"></a>    y_oscale,</span>
+<span id="cb28-5"><a href="#cb28-5" tabindex="-1"></a>    <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">ncol</span>(ilpreds)),</span>
+<span id="cb28-6"><a href="#cb28-6" tabindex="-1"></a>    cens,</span>
+<span id="cb28-7"><a href="#cb28-7" tabindex="-1"></a>    cl_ref,</span>
+<span id="cb28-8"><a href="#cb28-8" tabindex="-1"></a>    <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref))</span>
+<span id="cb28-9"><a href="#cb28-9" tabindex="-1"></a>) {</span>
+<span id="cb28-10"><a href="#cb28-10" tabindex="-1"></a>  idxs_cens <span class="ot">&lt;-</span> <span class="fu">which</span>(cens <span class="sc">==</span> <span class="dv">1</span>)</span>
+<span id="cb28-11"><a href="#cb28-11" tabindex="-1"></a>  idxs_event <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">seq_along</span>(cens), idxs_cens)</span>
+<span id="cb28-12"><a href="#cb28-12" tabindex="-1"></a>  wobs_mat <span class="ot">&lt;-</span> <span class="fu">matrix</span>(wobs, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds),</span>
+<span id="cb28-13"><a href="#cb28-13" tabindex="-1"></a>                     <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb28-14"><a href="#cb28-14" tabindex="-1"></a>  ll_unw <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds))</span>
+<span id="cb28-15"><a href="#cb28-15" tabindex="-1"></a>  <span class="cf">for</span> (idx_cens <span class="cf">in</span> idxs_cens) {</span>
+<span id="cb28-16"><a href="#cb28-16" tabindex="-1"></a>    ll_unw[, idx_cens] <span class="ot">&lt;-</span> <span class="fu">plnorm</span>(</span>
+<span id="cb28-17"><a href="#cb28-17" tabindex="-1"></a>      y_oscale[idx_cens],</span>
+<span id="cb28-18"><a href="#cb28-18" tabindex="-1"></a>      <span class="at">meanlog =</span> ilpreds[, idx_cens],</span>
+<span id="cb28-19"><a href="#cb28-19" tabindex="-1"></a>      <span class="at">sdlog =</span> dis,</span>
+<span id="cb28-20"><a href="#cb28-20" tabindex="-1"></a>      <span class="at">lower.tail =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb28-21"><a href="#cb28-21" tabindex="-1"></a>      <span class="at">log.p =</span> <span class="cn">TRUE</span></span>
+<span id="cb28-22"><a href="#cb28-22" tabindex="-1"></a>    )</span>
+<span id="cb28-23"><a href="#cb28-23" tabindex="-1"></a>  }</span>
+<span id="cb28-24"><a href="#cb28-24" tabindex="-1"></a>  <span class="cf">for</span> (idx_event <span class="cf">in</span> idxs_event) {</span>
+<span id="cb28-25"><a href="#cb28-25" tabindex="-1"></a>    ll_unw[, idx_event] <span class="ot">&lt;-</span> <span class="fu">dlnorm</span>(</span>
+<span id="cb28-26"><a href="#cb28-26" tabindex="-1"></a>      y_oscale[idx_event],</span>
+<span id="cb28-27"><a href="#cb28-27" tabindex="-1"></a>      <span class="at">meanlog =</span> ilpreds[, idx_event],</span>
+<span id="cb28-28"><a href="#cb28-28" tabindex="-1"></a>      <span class="at">sdlog =</span> dis,</span>
+<span id="cb28-29"><a href="#cb28-29" tabindex="-1"></a>      <span class="at">log =</span> <span class="cn">TRUE</span></span>
+<span id="cb28-30"><a href="#cb28-30" tabindex="-1"></a>    )</span>
+<span id="cb28-31"><a href="#cb28-31" tabindex="-1"></a>  }</span>
+<span id="cb28-32"><a href="#cb28-32" tabindex="-1"></a>  <span class="fu">return</span>(wobs_mat <span class="sc">*</span> ll_unw)</span>
+<span id="cb28-33"><a href="#cb28-33" tabindex="-1"></a>}, <span class="at">cens_var =</span> <span class="sc">~</span> is_censored)</span>
+<span id="cb28-34"><a href="#cb28-34" tabindex="-1"></a></span>
+<span id="cb28-35"><a href="#cb28-35" tabindex="-1"></a>latent_ppd_oscale_lnorm <span class="ot">&lt;-</span> <span class="cf">function</span>(</span>
+<span id="cb28-36"><a href="#cb28-36" tabindex="-1"></a>    ilpreds_resamp,</span>
+<span id="cb28-37"><a href="#cb28-37" tabindex="-1"></a>    <span class="at">dis_resamp =</span> <span class="fu">rep</span>(<span class="cn">NA</span>, <span class="fu">nrow</span>(ilpreds_resamp)),</span>
+<span id="cb28-38"><a href="#cb28-38" tabindex="-1"></a>    <span class="at">wobs =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">ncol</span>(ilpreds_resamp)),</span>
+<span id="cb28-39"><a href="#cb28-39" tabindex="-1"></a>    cl_ref,</span>
+<span id="cb28-40"><a href="#cb28-40" tabindex="-1"></a>    <span class="at">wdraws_ref =</span> <span class="fu">rep</span>(<span class="dv">1</span>, <span class="fu">length</span>(cl_ref)),</span>
+<span id="cb28-41"><a href="#cb28-41" tabindex="-1"></a>    idxs_prjdraws</span>
+<span id="cb28-42"><a href="#cb28-42" tabindex="-1"></a>) {</span>
+<span id="cb28-43"><a href="#cb28-43" tabindex="-1"></a>  <span class="fu">warning</span>(<span class="st">&quot;The draws from this `latent_ppd_oscale` function are uncensored.&quot;</span>)</span>
+<span id="cb28-44"><a href="#cb28-44" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">rlnorm</span>(</span>
+<span id="cb28-45"><a href="#cb28-45" tabindex="-1"></a>    <span class="fu">prod</span>(<span class="fu">dim</span>(ilpreds_resamp)),</span>
+<span id="cb28-46"><a href="#cb28-46" tabindex="-1"></a>    <span class="at">meanlog =</span> ilpreds_resamp,</span>
+<span id="cb28-47"><a href="#cb28-47" tabindex="-1"></a>    <span class="at">sdlog =</span> dis_resamp</span>
+<span id="cb28-48"><a href="#cb28-48" tabindex="-1"></a>  )</span>
+<span id="cb28-49"><a href="#cb28-49" tabindex="-1"></a>  ppd <span class="ot">&lt;-</span> <span class="fu">matrix</span>(ppd, <span class="at">nrow =</span> <span class="fu">nrow</span>(ilpreds_resamp), <span class="at">ncol =</span> <span class="fu">ncol</span>(ilpreds_resamp))</span>
+<span id="cb28-50"><a href="#cb28-50" tabindex="-1"></a>  <span class="fu">return</span>(ppd)</span>
+<span id="cb28-51"><a href="#cb28-51" tabindex="-1"></a>}</span>
+<span id="cb28-52"><a href="#cb28-52" tabindex="-1"></a></span>
+<span id="cb28-53"><a href="#cb28-53" tabindex="-1"></a>refm_lnorm <span class="ot">&lt;-</span> <span class="fu">get_refmodel</span>(</span>
+<span id="cb28-54"><a href="#cb28-54" tabindex="-1"></a>  refm_fit_lnorm,</span>
+<span id="cb28-55"><a href="#cb28-55" tabindex="-1"></a>  <span class="at">latent =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb28-56"><a href="#cb28-56" tabindex="-1"></a>  <span class="at">latent_ll_oscale =</span> latent_ll_oscale_lnorm,</span>
+<span id="cb28-57"><a href="#cb28-57" tabindex="-1"></a>  <span class="at">latent_ppd_oscale =</span> latent_ppd_oscale_lnorm,</span>
+<span id="cb28-58"><a href="#cb28-58" tabindex="-1"></a>  <span class="at">dis =</span> <span class="fu">as.matrix</span>(refm_fit_lnorm)[, <span class="st">&quot;sigma&quot;</span>, <span class="at">drop =</span> <span class="cn">FALSE</span>]</span>
+<span id="cb28-59"><a href="#cb28-59" tabindex="-1"></a>)</span></code></pre></div>
+<p>The message concerning <code>latent_ilink</code> can be safely
+ignored here (the internal default based on <code>family$linkinv</code>
+works correctly in this case).</p>
+<p>Run <code>cv_varsel()</code>:</p>
+<div class="sourceCode" id="cb29"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" tabindex="-1"></a><span class="co"># For running projpred&#39;s CV in parallel (see cv_varsel()&#39;s argument `parallel`):</span></span>
+<span id="cb29-2"><a href="#cb29-2" tabindex="-1"></a><span class="co"># Note: Parallel processing is disabled during package building to avoid issues</span></span>
+<span id="cb29-3"><a href="#cb29-3" tabindex="-1"></a>use_parallel <span class="ot">&lt;-</span> <span class="cn">FALSE</span>  <span class="co"># Set to TRUE for actual parallel processing</span></span>
+<span id="cb29-4"><a href="#cb29-4" tabindex="-1"></a><span class="cf">if</span> (use_parallel) {</span>
+<span id="cb29-5"><a href="#cb29-5" tabindex="-1"></a>  doParallel<span class="sc">::</span><span class="fu">registerDoParallel</span>(ncores)</span>
+<span id="cb29-6"><a href="#cb29-6" tabindex="-1"></a>}</span>
+<span id="cb29-7"><a href="#cb29-7" tabindex="-1"></a>cvvs_lnorm <span class="ot">&lt;-</span> <span class="fu">cv_varsel</span>(</span>
+<span id="cb29-8"><a href="#cb29-8" tabindex="-1"></a>  refm_lnorm,</span>
+<span id="cb29-9"><a href="#cb29-9" tabindex="-1"></a>  <span class="do">### Only for the sake of speed (not recommended in general):</span></span>
+<span id="cb29-10"><a href="#cb29-10" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">&quot;L1&quot;</span>,</span>
+<span id="cb29-11"><a href="#cb29-11" tabindex="-1"></a>  <span class="at">nloo =</span> <span class="fu">min</span>(N_surv, <span class="dv">10</span>),</span>
+<span id="cb29-12"><a href="#cb29-12" tabindex="-1"></a>  <span class="at">nterms_max =</span> <span class="dv">11</span>,</span>
+<span id="cb29-13"><a href="#cb29-13" tabindex="-1"></a>  <span class="at">nclusters_pred =</span> <span class="dv">20</span>,</span>
+<span id="cb29-14"><a href="#cb29-14" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb29-15"><a href="#cb29-15" tabindex="-1"></a>  <span class="at">parallel =</span> use_parallel,</span>
+<span id="cb29-16"><a href="#cb29-16" tabindex="-1"></a>  <span class="do">### In interactive use, we recommend not to deactivate the verbose mode:</span></span>
+<span id="cb29-17"><a href="#cb29-17" tabindex="-1"></a>  <span class="at">verbose =</span> <span class="dv">0</span></span>
+<span id="cb29-18"><a href="#cb29-18" tabindex="-1"></a>  <span class="do">###</span></span>
+<span id="cb29-19"><a href="#cb29-19" tabindex="-1"></a>)</span>
+<span id="cb29-20"><a href="#cb29-20" tabindex="-1"></a><span class="co"># Tear down the CV parallelization setup:</span></span>
+<span id="cb29-21"><a href="#cb29-21" tabindex="-1"></a><span class="cf">if</span> (use_parallel) {</span>
+<span id="cb29-22"><a href="#cb29-22" tabindex="-1"></a>  doParallel<span class="sc">::</span><span class="fu">stopImplicitCluster</span>()</span>
+<span id="cb29-23"><a href="#cb29-23" tabindex="-1"></a>  foreach<span class="sc">::</span><span class="fu">registerDoSEQ</span>()</span>
+<span id="cb29-24"><a href="#cb29-24" tabindex="-1"></a>}</span></code></pre></div>
+<p>In this case, we will ignore the warnings about high Pareto-<span class="math inline">\(\hat{k}\)</span> values because we chose quite
+rough settings (e.g., only 2 MCMC chains) in this vignette (for
+technical reasons). We will also ignore the warning that SIS is used
+(instead of PSIS) because this is due to
+<code>nclusters_pred = 20</code> which we used only to speed up the
+building of the vignette.</p>
+<p>Plot the results:</p>
+<div class="sourceCode" id="cb30"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" tabindex="-1"></a><span class="fu">plot</span>(cvvs_lnorm, <span class="at">stats =</span> <span class="st">&quot;mlpd&quot;</span>, <span class="at">deltas =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>Hence, the truly relevant predictors are identified correctly.</p>
+<p>Project onto the submodel consisting of the first
+<code>n_pred_truth</code> predictors and perform a “posterior-projection
+predictive check” (PPPC):</p>
+<div class="sourceCode" id="cb31"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" tabindex="-1"></a>predictors_final_lnorm <span class="ot">&lt;-</span> <span class="fu">head</span>(<span class="fu">ranking</span>(cvvs_lnorm)[[<span class="st">&quot;fulldata&quot;</span>]], n_pred_truth)</span>
+<span id="cb31-2"><a href="#cb31-2" tabindex="-1"></a>prj_lnorm <span class="ot">&lt;-</span> <span class="fu">project</span>(refm_lnorm, <span class="at">predictor_terms =</span> predictors_final_lnorm)</span>
+<span id="cb31-3"><a href="#cb31-3" tabindex="-1"></a>prj_predict_lnorm <span class="ot">&lt;-</span> <span class="fu">proj_predict</span>(prj_lnorm)</span>
+<span id="cb31-4"><a href="#cb31-4" tabindex="-1"></a>bayesplot<span class="sc">::</span><span class="fu">ppc_km_overlay</span>(<span class="at">y =</span> dat_sim_lnorm<span class="sc">$</span>yobs, <span class="at">yrep =</span> prj_predict_lnorm,</span>
+<span id="cb31-5"><a href="#cb31-5" tabindex="-1"></a>                          <span class="at">status_y =</span> <span class="dv">1</span> <span class="sc">-</span> dat_sim_lnorm<span class="sc">$</span>is_censored)</span></code></pre></div>
+<p>As expected, this PPPC indicates that this submodel is a reasonable
+one (keeping in mind that such a PPPC is just a single model-diagnostic
+tool).</p>
 </div>
 </div>
 <div id="references" class="section level2 unnumbered">
@@ -989,6 +1308,12 @@ of Response Distributions in brms”</a>) and prefer the term
 as <span class="math inline">\(\phi\)</span> from the Stan notation—is
 called the <em>dispersion</em> parameter there, although the variance is
 increased by its reciprocal).<a href="#fnref7" class="footnote-back">↩︎</a></p></li>
+<li id="fn8"><p>Briefly, the variable mentioned in the
+<code>cens_var</code> right-hand side formula needs to contain the
+censoring indicators (e.g., <code>0</code> = uncensored, <code>1</code>
+= censored) which can then be used within the custom
+<code>latent_ll_oscale</code> function via its argument
+<code>cens</code>.<a href="#fnref8" class="footnote-back">↩︎</a></p></li>
 </ol>
 </div>
 
